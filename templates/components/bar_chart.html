@@ -1,0 +1,90 @@
+<!-- components/bar_chart.html -->
+<div style="width: 100%; max-width: 1150px; margin: 10px auto 0 auto; min-height: 300px;">
+  <h2 class="dashboard-header" style="margin-bottom: 15px; font-family: 'Nunito', sans-serif; color: #22577A;">
+    Break-Up by Fund Category
+  </h2>
+  <div id="subcategory-bar" style="width: 100%;"></div>
+</div>
+
+<script>
+  const rawData = {{ grouped_subcategories | default([]) | tojson }};
+  const colors = {
+    'Debt':   '#219EBC',
+    'Equity': '#144552',
+    'Hybrid': '#999999',
+    'Commodity': '#68c7ca'
+  };
+
+  const data = (rawData || []).filter(d => typeof d.amount === 'number' && d.amount >= 1000);
+
+  if (data.length > 0) {
+    const xVals = data.map(d => d.amount / 1e6);
+    const yVals = data.map(d => d.subcategory);
+    const barColors = data.map(d => colors[d.category] || '#ccc');
+
+    // Only % for labels
+    const textLabels = data.map(d => `${d.percent.toFixed(1)}%`);
+    const custom = data.map(d => [d.amount, d.percent]);
+
+    const dynamicHeight = Math.max(250, 25 * data.length + 60);
+    const maxLabelLen = yVals.reduce((m, s) => Math.max(m, (s || '').length), 0);
+    const marginLeft = Math.min(300, Math.max(180, 8 * maxLabelLen));
+    const marginRight = 100;
+    const xMax = Math.max(...xVals) * 1.15;
+
+    Plotly.newPlot('subcategory-bar', [{
+      type: 'bar',
+      x: xVals,
+      y: yVals,
+      orientation: 'h',
+      marker: { color: barColors },
+      text: textLabels,
+      textposition: 'outside',
+      textfont: { family: 'Roboto, sans-serif', size: 12 }, // match axis font
+      cliponaxis: false,
+      hovertemplate: '₹%{customdata[0]:,.0f} (%{customdata[1]:.1f}%)<extra></extra>',
+      customdata: custom
+    }], {
+      margin: { l: marginLeft, r: marginRight, t: 5, b: 50 },
+      height: dynamicHeight,
+      xaxis: {
+        title: {
+          text: 'Current Holding',
+          font: { family: 'Roboto, sans-serif', size: 12 }
+        },
+        tickformat: '.1f',
+        tickprefix: '₹',
+        ticksuffix: ' M',
+        range: [0, xMax],
+        automargin: true,
+        tickfont: { family: 'Roboto, sans-serif', size: 12 }
+      },
+      yaxis: {
+        automargin: true,
+        categoryorder: 'array',
+        categoryarray: yVals,
+        ticks: 'outside',
+        ticklen: 10,
+        tickfont: { family: 'Roboto, sans-serif', size: 12 }
+      },
+      showlegend: false,
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)'
+    }, {
+      displayModeBar: false,
+      responsive: true
+    }).then(gd => {
+      Plotly.animate(gd, {
+        data: [{ x: xVals }],
+        traces: [0],
+        layout: {}
+      }, {
+        transition: { duration: 500, easing: 'cubic-in-out' },
+        frame: { duration: 500 }
+      });
+    });
+  } else {
+    document.getElementById('subcategory-bar').innerHTML =
+      "<p style='color: grey; text-align: center;'>No data available to display chart.</p>";
+  }
+</script>

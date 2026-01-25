@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Portfolio History Data</title>
+  <style>
+    body { font-family: 'Roboto', sans-serif; margin: 20px; }
+    h2 { color: #22577A; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+    th, td { padding: 8px; border: 1px solid #ccc; text-align: left; }
+    th { background-color: #38A3A5; color: white; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+  </style>
+</head>
+<body>
+  <h2>Portfolio History Data</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Value (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if data %}
+        {% for row in data %}
+          <tr>
+            <td>{{ row.date }}</td>
+            <td>₹{{ row.value }}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="2" style="text-align:center;">No data available</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</body>
+</html>

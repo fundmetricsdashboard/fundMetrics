@@ -1,0 +1,74 @@
+<!-- components/pie_chart.html -->
+<div style="width: 100%; max-width: 1150px; margin: 10px auto 0 auto;">
+  <h2 class="dashboard-header" style="margin-bottom: 15px; font-family: 'Nunito', sans-serif; color: #22577A;">
+    Break Up by Asset Class
+  </h2>
+
+  <div class="chart-container" style="display: flex; justify-content: center; align-items: center; height: 280px; margin-top: 0;">
+    <style>
+      /* Ensure the Plotly container background is transparent */
+      #pieChartDiv .plotly {
+        background-color: transparent !important;
+      }
+    </style>
+
+    <div id="pieChartDiv" style="width: 80%; height: 100%; max-width: 360px;"></div>
+  </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+  const labels = {{ category_labels | default([]) | tojson }};
+  const valuesInMillions = ({{ category_values_in_millions | default([]) | tojson }} || []).map(Number);
+  const fullValues = ({{ category_full_values | default([]) | tojson }} || []).map(Number);
+
+  const colorMap = {
+    Debt:   "#219EBC",
+    Equity: "#144552",
+    Hybrid: "#999999",
+    Commodity: '#68c7ca'
+  };
+  const sliceColors = labels.map(l => colorMap[l] || "#cccccc");
+
+  const total = valuesInMillions.reduce((a,b) => a+b, 0);
+
+  const shortLabels = labels.map((lab, i) => {
+    const pct = (valuesInMillions[i] / total) * 100;
+    return `${lab} (${pct.toFixed(1)}%)`;
+  });
+
+  Plotly.newPlot('pieChartDiv', [{
+    type: 'pie',
+    labels: labels,
+    values: valuesInMillions,
+    customdata: fullValues,
+    hole: 0.5,
+    pull: labels.map(() => 0.015),
+    rotation: -20,
+    sort: false,
+    direction: 'clockwise',
+    marker: {
+      colors: sliceColors,
+      line: { color: 'rgba(0,0,0,0)', width: 8 }
+    },
+    text: shortLabels,
+    textinfo: 'text',
+    textposition: 'outside',
+    textfont: { family: 'Roboto, sans-serif', size: 12 },
+    automargin: true,
+    hovertemplate: '%{label}<br>₹%{customdata:,.0f} (%{percent:.1%})<extra></extra>'
+  }], {
+    height: 280,
+    margin: { t: 8, r: 20, b: 20, l: 20 },
+    showlegend: false,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    hoverlabel: {
+      align: 'left',
+      font: { family: 'Roboto, sans-serif', size: 12 }
+    }
+  }, {
+    displayModeBar: false,
+    responsive: true
+  });
+</script>

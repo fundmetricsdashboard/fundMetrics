@@ -1,0 +1,169 @@
+<style>
+  /* Scope styles to this component */
+  .portfolio-evolution {
+      display: flex;
+      flex-direction: column;
+      height: 90%;
+      min-height: 0;
+  }
+  .portfolio-evolution .portfolio-header {
+      margin: 0 0 8px 0;
+  }
+  .portfolio-evolution .portfolio-toolbar {
+      margin-top: 8px;        /* fixed spacing unit typo */
+      text-align: center;
+      margin-bottom: 8px;
+      color: #38A3A5;
+      font-size: 0.85em;
+  }
+  .portfolio-evolution .portfolio-toolbar select {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #cfd8dc;
+      font-family: 'Roboto', sans-serif;
+      color: #38A3A5;
+      font-weight: 400;
+  }
+  .pe-chart-container {
+      position: relative;
+      flex: 1;           /* chart fills remaining height */
+      min-height: 180px; /* keeps it usable on smaller rows */
+      overflow: hidden;  /* prevents spill */
+  }
+  /* Let the canvas truly fill its container */
+  #portfolioChart {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+  }
+</style>
+
+<div class="portfolio-evolution">
+  <h2 class="dashboard-header portfolio-header">Portfolio Evolution</h2>
+
+  <div class="portfolio-toolbar">
+      <label for="periodSelect"><strong>Select Period:</strong></label>
+      <select id="periodSelect">
+          <option value="10">Last 10 Years</option>
+          <option value="5">Last 5 Years</option>
+          <option value="3" selected>Last 3 Years</option>
+          <option value="1">Last 1 Year</option>
+      </select>
+  </div>
+
+  <div class="pe-chart-container">
+      <canvas id="portfolioChart"></canvas>
+  </div>
+</div>
+
+<script>
+let portfolioChart;
+
+async function fetchPortfolioData(years) {
+  const userId = {{ user.id }};   // Jinja injects the correct user ID
+  const res = await fetch(`/api/portfolio-history?user_id=${userId}&dashboard_type=personal`, { cache: 'no-cache' });
+  return await res.json();
+}
+
+
+// No synthetic insertion; API returns exactly the downsampled points needed
+function filterPortfolioData(rawData, years) {
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - years);
+  return rawData.filter(d => new Date(d.date) >= cutoff);
+}
+
+function formatINR(n) {
+  try { return n.toLocaleString('en-IN'); }
+  catch { return n.toLocaleString(); }
+}
+
+async function renderPortfolioChart(years) {
+  const rawData = await fetchPortfolioData(years);
+  console.log("Raw data from backend:", rawData);
+
+  const data = filterPortfolioData(rawData, years); // client-side filtering
+  console.log("Data used for chart:", data);
+
+  if (!data || data.length === 0) {
+    console.warn("No portfolio data for years:", years);
+    document.getElementById('portfolioChart').style.display = 'none';
+    return;
+  } else {
+    document.getElementById('portfolioChart').style.display = 'block';
+  }
+
+  const labels = data.map(d => d.date);
+  const values = data.map(d => Number(d.value));
+
+  if (portfolioChart) portfolioChart.destroy();
+
+  const ctx = document.getElementById('portfolioChart').getContext('2d');
+
+  portfolioChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Portfolio Value',
+        data: values,
+        borderColor: '#38A3A5',
+        backgroundColor: 'rgba(56, 163, 165, 0.20)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 1.0,
+        pointHoverRadius: 3,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 8, right: 8, bottom: 8, left: 6 } },
+      plugins: {
+            legend: { display: false },
+            tooltip: {
+                  backgroundColor: 'rgba(56, 163, 165, 0.9)',   // teal background
+                  titleColor: '#ffffff',                        // white title text
+                  bodyColor: '#ffffff',                         // white body text
+                  borderColor: '#38A3A5',                       // subtle teal border
+                  borderWidth: 1,
+                  cornerRadius: 6,                              // rounded corners
+                  callbacks: {
+                        label: (ctx) => 'Value: ₹' + formatINR(ctx.parsed.y)
+                  }
+            }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: false,
+          ticks: {
+            maxTicksLimit: 5,
+            callback: (v) => '₹' + formatINR(v)
+          },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ✅ Initializer that was missing
+function initPortfolioProgression() {
+  const select = document.getElementById('periodSelect');
+  renderPortfolioChart(Number(select.value));
+
+  select.addEventListener('change', () => {
+    renderPortfolioChart(Number(select.value));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initPortfolioProgression);
+</script>

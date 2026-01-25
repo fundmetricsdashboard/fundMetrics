@@ -1,0 +1,38 @@
+<div class="chart-container" style="text-align: center; margin-top: 30px;">
+  <!-- <h3><strong>Break-Up by Fund House</strong></h3> -->
+  <div id="fundHouseChartDiv" style="display: inline-block;"></div>
+</div>
+
+<script>
+  const fhLabels = {{ fund_house_labels | default([]) | tojson }};
+  const fhValuesInMillions = {{ fund_house_values_in_millions | default([]) | tojson }};
+  const fhFullValues = {{ fund_house_full_values | default([]) | tojson }};
+
+  // Local palette so we don’t depend on any external “colors” variable
+  const fhColors = [
+    "#6699CC", "#FF9933", "#999999", "#66CC99", "#CC6699",
+    "#99CC66", "#FF6666", "#6666FF", "#FFCC66", "#66CCCC"
+  ];
+
+  const data = [{
+    type: 'pie',
+    labels: fhLabels,
+    values: fhValuesInMillions,
+    customdata: fhFullValues,
+    texttemplate: '%{label} (%{percent:.1%})<br>₹ %{value:.1f} m',
+    hovertemplate: '%{label}<br>₹ %{customdata:,}<extra></extra>',
+    marker: { colors: fhColors },
+    textposition: 'inside',
+    automargin: true,
+    hole: 0.35
+  }];
+
+  const layout = {
+    height: 350,
+    width: 350,
+    margin: { t: 40, b: 20 },
+    showlegend: false
+  };
+
+  Plotly.newPlot('fundHouseChartDiv', data, layout);
+</script>

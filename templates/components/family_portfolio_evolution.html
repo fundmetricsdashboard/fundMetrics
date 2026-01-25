@@ -1,0 +1,171 @@
+<style>
+  /* Scope styles to this component */
+  .portfolio-evolution {
+      display: flex;
+      flex-direction: column;
+      height: 90%;
+      min-height: 0;
+  }
+  .portfolio-evolution .portfolio-header {
+      margin: 0 0 8px 0;
+  }
+  .portfolio-evolution .portfolio-toolbar {
+      margin-top: 8px;
+      text-align: center;
+      margin-bottom: 8px;
+      color: #5F6F94;
+      font-size: 0.85em;
+  }
+  .portfolio-evolution .portfolio-toolbar select {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #cfd8dc;
+      font-family: 'Roboto', sans-serif;
+      color: #58A0C8;
+      font-weight: 400;
+  }
+  .pe-chart-container {
+      position: relative;
+      flex: 1;
+      min-height: 180px;
+      overflow: hidden;
+  }
+  #familyPortfolioChart {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+  }
+</style>
+
+<div class="portfolio-evolution">
+  <h2 class="dashboard-header portfolio-header">Portfolio Evolution</h2>
+
+  <div class="portfolio-toolbar">
+      <label for="familyPeriodSelect"><strong>Select Period:</strong></label>
+      <select id="familyPeriodSelect">
+          <option value="10">Last 10 Years</option>
+          <option value="5">Last 5 Years</option>
+          <option value="3" selected>Last 3 Years</option>
+          <option value="1">Last 1 Year</option>
+      </select>
+  </div>
+
+  <div class="pe-chart-container">
+      <canvas id="familyPortfolioChart"></canvas>
+  </div>
+</div>
+
+<script>
+let familyPortfolioChart;
+
+/* -------------------------------
+   1. Fetch snapshot-based data
+--------------------------------*/
+async function fetchFamilyPortfolioData(years) {
+  const userId = {{ user.id }};
+  const res = await fetch(
+      `/family-portfolio-history?user_id=${userId}&years=${years}`,
+      { cache: 'no-cache' }
+  );
+  return await res.json();
+}
+
+/* -------------------------------
+   2. INR formatting helper
+--------------------------------*/
+function formatINR(n) {
+  try { return n.toLocaleString('en-IN'); }
+  catch { return n.toLocaleString(); }
+}
+
+/* -------------------------------
+   3. Render chart with filtering
+--------------------------------*/
+async function renderFamilyPortfolioChart(years) {
+  const rawData = await fetchFamilyPortfolioData(years);
+
+  // Compute cutoff date
+  const cutoffDate = new Date();
+  cutoffDate.setFullYear(cutoffDate.getFullYear() - years);
+
+  // Filter snapshot data by selected period
+  const data = rawData.filter(d => new Date(d.date) >= cutoffDate);
+
+  if (!data || data.length === 0) {
+    console.warn("No family portfolio data for years:", years);
+    document.getElementById('familyPortfolioChart').style.display = 'none';
+    return;
+  } else {
+    document.getElementById('familyPortfolioChart').style.display = 'block';
+  }
+
+  const labels = data.map(d => d.date);
+  const values = data.map(d => Number(d.value));
+
+  if (familyPortfolioChart) familyPortfolioChart.destroy();
+
+  const ctx = document.getElementById('familyPortfolioChart').getContext('2d');
+
+  familyPortfolioChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Family Portfolio Value',
+        data: values,
+        borderColor: '#5F6F94',
+        backgroundColor: 'rgba(95, 111, 148, 0.2)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 1.0,
+        pointHoverRadius: 3,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 8, right: 8, bottom: 8, left: 6 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => 'Value: ₹' + formatINR(ctx.parsed.y)
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: false,
+          ticks: {
+            maxTicksLimit: 5,
+            callback: (v) => '₹' + formatINR(v)
+          },
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+/* -------------------------------
+   4. Init on page load
+--------------------------------*/
+function initFamilyPortfolioProgression() {
+  const select = document.getElementById('familyPeriodSelect');
+  renderFamilyPortfolioChart(Number(select.value));
+
+  select.addEventListener('change', () => {
+    renderFamilyPortfolioChart(Number(select.value));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initFamilyPortfolioProgression);
+</script>

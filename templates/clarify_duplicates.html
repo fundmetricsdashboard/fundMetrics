@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Clarify Duplicates – fundMetrics</title>
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+
+        .banner {
+            background-color: #38A3A5;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            background: white;
+            padding: 25px 35px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        h2 {
+            color: #22577A;
+            margin-bottom: 10px;
+        }
+
+        .group-box {
+            border: 2px solid #38A3A5;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+            background: #f0fffd;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background: #22577A;
+            color: white;
+        }
+
+        .submit-btn {
+            background-color: #38A3A5;
+            color: white;
+            padding: 14px 22px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            background-color: #2d8284;
+        }
+
+        .note {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="banner">Clarify Duplicate Transactions</div>
+
+<div class="container">
+
+    <h2>We found duplicate entries in your upload</h2>
+    <p class="note">
+        Select the rows you want to keep. Unselected rows will be removed from staging.
+    </p>
+
+    <form method="POST" action="{{ url_for('confirm_staging') }}">
+
+        {% for row_hash, rows in grouped_staging.items() %}
+        <div class="group-box">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>Date</th>
+                        <th>ISIN</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Units</th>
+                        <th>NAV</th>
+                        <th>Source File</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for r in rows %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="keep_raw_id" value="{{ r.id }}">
+                        </td>
+                        <td>{{ r.date }}</td>
+                        <td>{{ r.isin }}</td>
+                        <td>{{ r.transaction_type }}</td>
+                        <td>{{ r.amount }}</td>
+                        <td>{{ r.units }}</td>
+                        <td>{{ r.nav }}</td>
+                        <td>{{ r.source_file }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="submit-btn">Confirm Selected Rows</button>
+
+    </form>
+
+</div>
+
+</body>
+</html>

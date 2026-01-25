@@ -1,0 +1,89 @@
+<!-- components/investment_table.html -->
+<div style="width: 90%; max-width: 1600px; margin: 0 auto 0 auto;">
+
+  <!-- Section header (matches pie chart: centered, Nunito, #22577A) -->
+  <h2 class="dashboard-header"
+      style="margin-bottom: 15px; font-family: 'Nunito', sans-serif; color: #22577A; text-align: center;">
+    Top 5 Funds
+  </h2>
+
+  <style>
+    /* Scoped to this component */
+    .top5-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Roboto', sans-serif;
+      font-size: 14px;
+      /* transparent table body */
+      background: transparent;
+    }
+    .top5-table thead th {
+      padding: 9px 12px;
+      text-align: left;
+      background-color: #1F7A8C; /* requested header color */
+      color: #FFFFFF;
+      border: 1px solid #1F7A8C; /* lines same color as header */
+      vertical-align: middle;
+      font-weight: 600;
+    }
+    .top5-table tbody td {
+      padding: 9px 12px;
+      border: 1px solid #1F7A8C; /* lines same color as header */
+      vertical-align: middle;
+      background: transparent; 
+    }
+    .fund-name-col {
+      max-width: 340px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+
+  <table class="top5-table">
+    <thead>
+      <tr>
+        <th>Fund Name</th>
+        <th>Subcategory</th>
+        <th>Plan Type</th>
+        <th>Current Holding</th> 
+        <th>% Holding</th>
+        <th>Returns (XIRR)</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for inv in investments | sort(attribute='amount', reverse=true) %}
+            {% if loop.index <= 5 %}
+                {# XIRR can be on inv or inv.fund; handle both #}
+                {% if inv.xirr is defined %}
+                    {% set xirr_val = inv.xirr %}
+                {% elif inv.fund is defined and inv.fund.xirr is defined %}
+                    {% set xirr_val = inv.fund.xirr %}
+                {% else %}
+                    {% set xirr_val = none %}
+                {% endif %}
+
+                <tr>
+                    <td class="fund-name-col">{{ inv.fund_display_name }}</td>
+                    <td>{{ inv.subcategory }}</td>
+                    <td>{{ inv.plan_type }}</td>
+                    <td>₹ {{ "{:,.0f}".format(inv.amount) }}</td>
+                    <td>{{ inv.percent_holding|default(0)|round(1) }}%</td>
+                    <td>
+                        {% if xirr_val is not none %}
+                            {% if xirr_val <= 1 %}
+                                {{ "{:.2%}".format(xirr_val) }}
+                            {% else %}
+                                {{ "{:.2f}".format(xirr_val) }}%
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endif %}
+        {% endfor %}
+    </tbody>
+
+  </table>
+</div>

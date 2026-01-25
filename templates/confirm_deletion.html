@@ -1,0 +1,27 @@
+<div style="max-width: 600px; margin: 40px auto; font-family: 'Nunito', sans-serif;">
+  <h2 style="color: #22577A;">Confirm Deletion: {{ registrar }} Data</h2>
+
+  <!-- Explicit action ensures POST hits the route -->
+  <form method="POST" action="">
+    <label for="reason" style="font-weight: 600;">Reason for deletion:</label><br>
+    <textarea name="reason" rows="4" style="width: 100%; margin-top: 8px;" required></textarea><br><br>
+
+    <div style="display: flex; align-items: center;">
+
+      <!-- Confirm Button -->
+      <button type="submit"
+              style="background-color: #22577A; color: white; padding: 8px 20px;
+                     border: none; border-radius: 4px; font-size: 14px;">
+        Confirm and Delete
+      </button>
+
+      <!-- Cancel Button -->
+      <a href="{{ url_for('upload_center') }}"
+         style="margin-left: auto; background-color: #22577A; color: white; padding: 8px 20px;
+                border-radius: 4px; font-size: 14px; text-decoration: none; display: inline-block;">
+        Cancel and Return
+      </a>
+
+    </div>
+  </form>
+</div>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mutual Fund Dashboard</title>
+
+    <!-- Nunito (headings) + Roboto (body) -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Chart libraries -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+    <style>
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px 0;
+            background-image: url("{{ url_for('static', filename='images/dashboard_background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        h1, h2, h3, h4, h5, h6,
+        .dashboard-header,
+        .banner {
+            font-family: 'Nunito', sans-serif;
+            color: #22577A;
+        }
+
+        .banner {
+            background-color: #38A3A5;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 2.2em;
+            font-weight: bold;
+            border-radius: 12px;
+            margin: 0 auto 20px auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        /* 🔹 Logout bar */
+        .logout-container {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            padding-right: 5px;
+        }
+
+        .logout-text {
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #22577A;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .logout-text:hover {
+            color: #38A3A5;
+        }
+
+        .logout-btn {
+            background-color: #16476A;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.95em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 3px 8px rgba(56, 163, 165, 0.3);
+        }
+
+        .logout-btn:hover {
+            background-color: #0E2C42;
+            transform: translateY(-1px);
+        }
+
+        .logout-btn:active {
+            transform: translateY(0);
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .row.equal-height {
+            align-items: stretch;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .chart-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-height: 100%;
+        }
+
+        .chart-wrapper canvas,
+        .chart-wrapper #pieChartDiv {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .dashboard-container .row:first-of-type {
+            margin-bottom: 60px;
+        }
+
+        .row.equal-height .col:first-child .dashboard-header {
+            text-align: center;
+        }
+
+        .pie-chart-wrapper {
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .pie-chart-wrapper #pieChartDiv {
+            max-width: 90%;
+            height: auto !important;
+        }
+
+        .bar-chart-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-height: 100%;
+        }
+
+        .bar-chart-wrapper canvas,
+        .bar-chart-wrapper #barChartDiv {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .dashboard-container .row:nth-of-type(2) > .col > *:last-child {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .dashboard-container .row:nth-of-type(2) {
+            margin-bottom: 25px !important;
+        }
+
+        @media (max-width: 992px) {
+            .row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<div style="
+    position: fixed;
+    bottom: 20px;
+    right: 25px;
+    z-index: 9999;
+    pointer-events: auto;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.95em;
+    background: rgba(189, 232, 245, 0.5);
+    padding: 8px 14px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+">
+    <a href="{{ url_for('family_dashboard_bp.family_dashboard') }}"
+       style="color: #22577A; text-decoration: none; font-weight: 600;">
+        View {{ family_name }} Family Dashboard
+    </a>
+</div>
+
+<body>
+
+<div class="dashboard-container">
+
+    <div class="banner">Mutual Fund Dashboard</div>
+
+    <!-- 🔹 Logout bar -->
+    <div class="logout-container">
+        <a href="{{ url_for('logout') }}" class="logout-text">Logout</a>
+        <button onclick="window.location='{{ url_for('logout') }}'" class="logout-btn">X</button>
+    </div>
+
+    <!-- Row 1 -->
+    <div class="row equal-height">
+        <div class="col" style="flex: 1;">
+            {% include 'components/summary_card.html' %}
+        </div>
+        <div class="col" style="flex: 2;">
+            <div class="chart-wrapper">
+                {% include 'components/portfolio_evolution.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="row equal-height">
+        <div class="col" style="flex: 1;">
+            <div class="chart-wrapper pie-chart-wrapper">
+                {% include 'components/pie_chart.html' %}
+            </div>
+        </div>
+        <div class="col" style="flex: 2;">
+            <div class="chart-wrapper bar-chart-wrapper">
+                {% include 'components/bar_chart.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3 -->
+    <div class="row">
+        <div class="col" style="flex: 1 1 100%;">
+            {% include 'components/investment_table.html' %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+function initBarChart(ctx, labels, values, percentages) {
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                percentages: percentages,
+                backgroundColor: '#38A3A5'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.dataset.data[context.dataIndex];
+                            return 'Value: ₹' + value.toLocaleString('en-IN');
+                        }
+                    }
+                },
+                datalabels: {
+                    formatter: function(value, context) {
+                        return context.dataset.percentages[context.dataIndex] + '%';
+                    },
+                    color: '#000',
+                    anchor: 'end',
+                    align: 'right'
+                }
+            },
+            scales: {
+                x: { ticks: { autoSkip: false } },
+                y: { display: false }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+}
+</script>
+
+</body>
+</html>

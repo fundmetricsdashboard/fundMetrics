@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Center – fundMetrics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url("{{ url_for('static', filename='images/dashboard_background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        .banner {
+            font-family: 'Nunito', sans-serif;
+            background-color: #38A3A5;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 2.2em;
+            font-weight: bold;
+            border-radius: 12px;
+            margin: 20px auto;
+            max-width: 1600px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .page-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 140px);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        h2 {
+            font-family: 'Nunito', sans-serif;
+            color: #22577A;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 2.2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.95em;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #22577A;
+            font-family: 'Nunito', sans-serif;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background: white;
+        }
+
+        button {
+            width: 100%;
+            background-color: #38A3A5;
+            color: white;
+            padding: 14px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2d8284;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+            padding: 12px 15px;
+            background-color: #ffe8e8;
+            border-left: 4px solid #ff4d4d;
+            border-radius: 6px;
+            color: #b30000;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .flash-messages.success {
+            background-color: #e8f5e9;
+            border-left-color: #4caf50;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="banner">Upload Center</div>
+
+    <div class="page-wrapper">
+        <div class="container">
+
+            <h2>Upload Your Data</h2>
+            <p class="subtitle">Choose the type of file you want to upload</p>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <div class="flash-messages {% if 'successfully' in messages[0] %}success{% endif %}">
+                  {% for message in messages %}
+                    <div>{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+            <!-- CAMS Upload -->
+            <div class="upload-section">
+                <label>CAMS Statement Upload</label>
+                <form action="{{ url_for('upload_cams_statement') }}" method="POST" enctype="multipart/form-data">
+                    <input type="file" name="statement_file" required>
+                    <button type="submit">Upload CAMS Statement</button>
+                </form>
+            </div>
+
+            <!-- Karvy Upload -->
+            <div class="upload-section">
+                <label>Karvy Statement Upload</label>
+                <form action="{{ url_for('upload_karvy_statement') }}" method="POST" enctype="multipart/form-data">
+                    <input type="file" name="statement_file" required>
+                    <button type="submit">Upload Karvy Statement</button>
+                </form>
+            </div>
+
+            <!-- Commodity Upload -->
+            <div class="upload-section">
+                <label>Commodity Excel Upload</label>
+                <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data">
+                    <input type="file" name="excel_file" required>
+                    <button type="submit">Upload Commodity Excel</button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

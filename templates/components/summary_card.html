@@ -1,0 +1,160 @@
+<div class="summary-card-container">
+  <div class="summary-card">
+    <!-- Username in top-right -->
+    <div class="summary-username">{{ user.name }}</div>
+
+    <!-- Centered content area -->
+    <div class="summary-card-body">
+      <div class="summary-metric">
+        <span class="label">Portfolio Value</span>
+        <span class="value">₹{{ "{:,.0f}".format(summary_portfolio_value) }}</span>
+      </div>
+      <div class="summary-metric">
+        <span class="label">Appreciation</span>
+        <span class="value {{ 'positive' if summary_appreciation >= 0 else 'negative' }}">
+          ₹{{ "{:,.0f}".format(summary_appreciation) }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Ribbon -->
+    <div class="summary-card-ribbon">
+      <div class="ribbon-item left">
+        <span class="ribbon-label">Cost Value</span>
+        <span class="ribbon-value">₹{{ "{:,.0f}".format(summary_cost_value) }}</span>
+      </div>
+      <div class="ribbon-item center">
+        <span class="ribbon-label">Wt. Avg Days</span>
+        <span class="ribbon-value">{{ "{:,.0f}".format(summary_wt_avg_days) }}</span>
+      </div>
+      <div class="ribbon-item right">
+        <span class="ribbon-label">Returns (XIRR)</span>
+        <span class="ribbon-value">{{ "{:.2%}".format(summary_xirr) }}</span>
+      </div>
+    </div>
+
+    <div class="summary-card-footer">
+      <a href="{{ url_for('dashboard_tables_bp.dashboard_tables', user_id=user.id) }}"
+         style="font-family: 'Nunito', sans-serif; color: #7AB2B2; font-weight: 600; text-decoration: none;">
+        View Summary Tables
+      </a>
+    </div>
+  </div>
+</div>
+
+
+<style>
+.summary-card-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.summary-card {
+  width: 70%;
+  aspect-ratio: 1.586 / 1;
+  position: relative;
+  border-radius: 15px;
+  color: white;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.3);
+  overflow: hidden;
+
+  /* Solid background image */
+  background: url("{{ url_for('static', filename='images/summary_card_background.png') }}") center/cover no-repeat;
+}
+
+.summary-username,
+.summary-card-body,
+.summary-card-ribbon,
+.summary-card-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.summary-username {
+  position: absolute;
+  top: 24px;
+  right: 18px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.summary-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.summary-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.summary-metric .label {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.summary-metric .value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.summary-metric .value.positive { color: #00DFA2; }
+.summary-metric .value.negative { color: #ff6b6b; }
+
+.summary-card-ribbon {
+  margin-top: auto;
+  background-color: rgba(54, 54, 54, 0.88);
+  height: 1.0cm;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  padding: 6px 14px;
+  gap: 10px;
+}
+
+.ribbon-item { display: flex; flex-direction: column; }
+.ribbon-item.left   { align-items: flex-start; }
+.ribbon-item.center { align-items: center; }
+.ribbon-item.right  { align-items: flex-end; }
+
+.ribbon-label {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.ribbon-value {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.summary-card-footer {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.details-btn {
+  background-color: rgba(255,255,255,0.15);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, transform 0.05s ease;
+}
+
+.details-btn:hover { background-color: rgba(255,255,255,0.3); }
+.details-btn:active { transform: translateY(1px); }
+</style>

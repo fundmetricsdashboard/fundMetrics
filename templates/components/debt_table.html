@@ -1,0 +1,189 @@
+{% if debt_investments %}
+<h2 class="section-title" style="color: #219EBC;">Debt Funds</h2>
+
+<style>
+  .debt-table {
+    width: 95%;
+    margin: 0 auto 40px auto;
+    border-collapse: collapse;
+    font-family: 'Roboto', sans-serif;
+    border: 2px solid #219EBC;
+    table-layout: fixed;
+  }
+  .debt-table thead th {
+    background-color: #219EBC;
+    color: #ffffff;
+    padding: 6px 12px;
+    border: 1px solid #219EBC;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .debt-table tbody td,
+  .debt-table tfoot td {
+    border: 1px solid #219EBC;
+    padding: 6px 12px;
+    vertical-align: middle;
+  }
+  .debt-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  .debt-table th.fund-col,
+  .debt-table td.fund-col {
+    width: 32%;
+    text-align: left;
+  }
+  .center-text { text-align: center; }
+  .right-text { text-align: right; padding-right: 8px; }
+  .total-row { font-weight: bold; background-color: #e6e6e6; }
+
+  /* Compact arrows */
+  .sort-arrows {
+    display: inline-flex;
+    flex-direction: column;
+    margin-left: 3px;
+    vertical-align: middle;
+    gap: 2px;
+  }
+  .sort-arrow {
+    width: 0;
+    height: 0;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+  }
+  .sort-arrow.up {
+    border-bottom: 5px solid currentColor;
+  }
+  .sort-arrow.down {
+    border-top: 5px solid currentColor;
+  }
+  .sort-arrow.up.active {
+    border-bottom-color: gold;
+  }
+  .sort-arrow.down.active {
+    border-top-color: gold;
+  }
+</style>
+
+<table class="debt-table" id="debtTable">
+  <thead>
+    <tr>
+      <th class="fund-col" onclick="sortTable('debtTable', 0, 'string')">
+        Fund Name
+        <span class="sort-arrows">
+          <span class="sort-arrow up"></span>
+          <span class="sort-arrow down"></span>
+        </span>
+      </th>
+
+      <th class="center-text">Fund Type</th>
+      <th class="center-text">Plan Type</th>
+      <th class="center-text">Growth Type</th>
+
+      <th class="right-text" onclick="sortTable('debtTable', 4, 'number')">
+        Value
+        <span class="sort-arrows">
+          <span class="sort-arrow up"></span>
+          <span class="sort-arrow down"></span>
+        </span>
+      </th>
+
+      <th class="right-text" onclick="sortTable('debtTable', 5, 'number')">
+        Duration
+        <span class="sort-arrows">
+          <span class="sort-arrow up"></span>
+          <span class="sort-arrow down"></span>
+        </span>
+      </th>
+
+      <th class="right-text" onclick="sortTable('debtTable', 6, 'number')">
+        Returns (XIRR)
+        <span class="sort-arrows">
+          <span class="sort-arrow up"></span>
+          <span class="sort-arrow down"></span>
+        </span>
+      </th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {% for inv in debt_investments %}
+    <tr>
+      <td class="fund-col">{{ inv.fund_display_name }}</td>
+      <td class="center-text">{{ inv.fund.sub_category.name }}</td>
+      <td class="center-text">{{ inv.plan_type }}</td>
+      <td class="center-text">{{ inv.growth_type }}</td>
+
+      <td class="right-text">₹ {{ "{:,.0f}".format(inv.current_value) }}</td>
+
+      <td class="right-text">
+        {% if inv.holding_period is not none %}
+          {{ "%.2f"|format(inv.holding_period) }} yrs
+        {% else %}
+          N/A
+        {% endif %}
+      </td>
+
+      <td class="right-text">
+        {% if inv.xirr is not none %}
+          {{ "%.2f"|format(inv.xirr) }}%
+        {% else %}
+          N/A
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+
+  <tfoot>
+    <tr class="total-row">
+      <td class="fund-col"></td>
+      <td class="center-text"></td>
+      <td class="center-text"></td>
+      <td class="center-text">Total</td>
+      <td class="right-text">₹ {{ "{:,.0f}".format(debt_total or 0) }}</td>
+      <td class="right-text"></td>
+      <td class="right-text"></td>
+    </tr>
+  </tfoot>
+</table>
+
+<script>
+function sortTable(tableId, colIndex, type) {
+    const table = document.getElementById(tableId);
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+
+    const prevCol = table.getAttribute("data-sort-col");
+    const prevOrder = table.getAttribute("data-sort-order");
+    const ascending = prevCol != colIndex || prevOrder !== "asc";
+
+    rows.sort((a, b) => {
+        let aText = a.cells[colIndex].innerText.trim();
+        let bText = b.cells[colIndex].innerText.trim();
+
+        if (type === 'number') {
+            aText = aText.replace(/[₹,%]/g, '');
+            bText = bText.replace(/[₹,%]/g, '');
+            const aVal = parseFloat(aText) || 0;
+            const bVal = parseFloat(bText) || 0;
+            return ascending ? aVal - bVal : bVal - aVal;
+        } else {
+            return ascending ? aText.localeCompare(bText) : bText.localeCompare(aText);
+        }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+
+    table.setAttribute("data-sort-col", colIndex);
+    table.setAttribute("data-sort-order", ascending ? "asc" : "desc");
+
+    [...table.tHead.rows[0].cells].forEach(th => {
+        th.querySelectorAll('.sort-arrow').forEach(el => el.classList.remove('active'));
+    });
+    const th = table.tHead.rows[0].cells[colIndex];
+    th.querySelector(`.sort-arrow.${ascending ? 'up' : 'down'}`).classList.add('active');
+}
+</script>
+{% endif %}

@@ -1,0 +1,88 @@
+<!-- components/family_pie_chart.html -->
+<div style="
+    width: 100%;
+    max-width: 1150px;
+    margin: 10px auto 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+">
+
+  <!-- Centered Header -->
+  <h2 class="dashboard-header"
+      style="margin-bottom: 15px; font-family: 'Nunito', sans-serif; color: #22577A; text-align: center;">
+    Break Up by Asset Class
+  </h2>
+
+  <!-- Centered Pie Chart Container -->
+  <div class="chart-container"
+       style="display: flex; justify-content: center; align-items: center; height: 280px; margin-top: 0; width: 100%;">
+    
+    <style>
+      /* Ensure the Plotly container background is transparent */
+      #familyPieChartDiv .plotly {
+        background-color: transparent !important;
+      }
+    </style>
+
+    <div id="familyPieChartDiv"
+         style="width: 80%; height: 100%; max-width: 360px;">
+    </div>
+  </div>
+</div>
+
+<script>
+  const familyLabels = {{ family_category_labels | default([]) | tojson }};
+  const familyValuesInMillions = ({{ family_category_values_in_millions | default([]) | tojson }} || []).map(Number);
+  const familyFullValues = ({{ family_category_full_values | default([]) | tojson }} || []).map(Number);
+
+  const colorMap = {
+    Debt:   "#34699A",
+    Equity: "#16476A",
+    Hybrid: "#94B4C1",
+    Commodity: "#58A0C8"
+  };
+  const sliceColors = familyLabels.map(l => colorMap[l] || "#cccccc");
+
+  const total = familyValuesInMillions.reduce((a, b) => a + b, 0);
+
+  const shortLabels = familyLabels.map((lab, i) => {
+    const pct = (familyValuesInMillions[i] / total) * 100;
+    return `${lab} (${pct.toFixed(1)}%)`;
+  });
+
+  Plotly.newPlot('familyPieChartDiv', [{
+    type: 'pie',
+    labels: familyLabels,
+    values: familyValuesInMillions,
+    customdata: familyFullValues,
+    hole: 0.5,
+    pull: familyLabels.map(() => 0.015),
+    rotation: -20,
+    sort: false,
+    direction: 'clockwise',
+    marker: {
+      colors: sliceColors,
+      line: { color: 'rgba(0,0,0,0)', width: 8 }
+    },
+    text: shortLabels,
+    textinfo: 'text',
+    textposition: 'outside',
+    textfont: { family: 'Roboto, sans-serif', size: 12 },
+    automargin: true,
+    hovertemplate: '%{label}<br>₹%{customdata:,.0f} (%{percent:.1%})<extra></extra>'
+  }], {
+    height: 280,
+    margin: { t: 8, r: 20, b: 20, l: 20 },
+    showlegend: false,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    hoverlabel: {
+      align: 'left',
+      font: { family: 'Roboto, sans-serif', size: 12 }
+    }
+  }, {
+    displayModeBar: false,
+    responsive: true
+  });
+</script>

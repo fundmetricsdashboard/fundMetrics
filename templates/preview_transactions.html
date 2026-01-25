@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Preview New Transactions</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px 0;
+            background-image: url("{{ url_for('static', filename='images/dashboard_background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        .page-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .banner {
+            background-color: #38A3A5;
+            color: white;
+            text-align: center;
+            padding: 22px 0;
+            font-size: 2.2em;
+            font-weight: bold;
+            border-radius: 12px;
+            margin: 0 auto 40px auto;
+            font-family: 'Nunito', sans-serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .form-wrapper {
+            background: rgba(255, 255, 255, 0.92);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            margin: 0 auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        th {
+            background: #f0f0f0;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        .delete-row-btn {
+            background: #ED775A;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-row {
+                margin-top: 20px;
+                display: flex;
+                justify-content: center;
+                gap: 15px;
+        }
+
+
+        .btn {
+            padding: 10px 20px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        .btn-cancel { background: #ED775A; color: white; }
+        .btn-back { background: #78B3CE; color: white; }
+        .btn-submit { background: #38A3A5; color: white; }
+    </style>
+</head>
+
+<body>
+
+<div class="page-container">
+
+    <div class="banner">Preview New Transactions</div>
+
+    <div class="form-wrapper">
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fund</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>NAV</th>
+                    <th>Units</th>
+                    <th>Folio</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+
+            <tbody id="previewBody">
+                {% for row in preview_data %}
+                <tr>
+                    <td>{{ row.fund_name }}</td>
+                    <td>{{ row.txn_type }}</td>
+                    <td>{{ row.date }}</td>
+                    <td>{{ row.amount }}</td>
+                    <td>{{ row.nav }}</td>
+                    <td>{{ row.units }}</td>
+                    <td>{{ row.folio }}</td>
+                    <td><button type="button" class="delete-row-btn">✖</button></td>
+
+                    <!-- Hidden fields -->
+                    <input type="hidden" name="fund_id_{{ row.index }}" value="{{ row.fund_id }}">
+                    <input type="hidden" name="txn_type_{{ row.index }}" value="{{ row.txn_type }}">
+                    <input type="hidden" name="date_{{ row.index }}" value="{{ row.date }}">
+                    <input type="hidden" name="amount_{{ row.index }}" value="{{ row.amount }}">
+                    <input type="hidden" name="nav_{{ row.index }}" value="{{ row.nav }}">
+                    <input type="hidden" name="units_{{ row.index }}" value="{{ row.units }}">
+                    <input type="hidden" name="folio_{{ row.index }}" value="{{ row.folio }}">
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="btn-row">
+
+            <a href="{{ url_for('dashboard_bp.dashboard', user_id=current_user.id) }}">
+                <button type="button" class="btn btn-cancel">Cancel</button>
+            </a>
+
+            <a href="{{ url_for('dashboard_tables_bp.add_transactions', user_id=current_user.id) }}">
+                <button type="button" class="btn btn-back">Back</button>
+            </a>
+
+            <form action="{{ url_for('dashboard_tables_bp.commit_transactions') }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-submit">Submit</button>
+            </form>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener("click", function(e) {
+    if (e.target.classList.contains("delete-row-btn")) {
+        e.target.closest("tr").remove();
+    }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Update MF Investments</title>
+
+    <!-- Nunito (headings) + Roboto (body) -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px 0;
+            background-image: url("{{ url_for('static', filename='images/dashboard_background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        .page-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .banner {
+            background-color: #38A3A5;
+            color: white;
+            text-align: center;
+            padding: 22px 0;
+            font-size: 2.2em;
+            font-weight: bold;
+            border-radius: 12px;
+            margin: 0 auto 40px auto;
+            font-family: 'Nunito', sans-serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .form-wrapper {
+            background: rgba(255, 255, 255, 0.92);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            margin: 0 auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+
+        th {
+            background: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        td {
+            padding: 8px;
+            border: 1px solid #ccc;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 7px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .btn-row {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 6px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        .btn-add { background: #5682B1; color: white; }
+        .btn-submit { background: #71BBB2; color: white; }
+        .btn-preview { background: #78B3CE; color: white; }
+
+        .delete-row-btn {
+            background: #ED775A;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .autocomplete-wrapper { position: relative; }
+
+        .autocomplete-box {
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            position: absolute;
+            background: white;
+            z-index: 1000;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .autocomplete-item {
+            padding: 6px 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background: #eee;
+        }
+
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 8px;
+            color: white;
+            white-space: nowrap;
+        }
+
+        .badge-debt { background: #219EBC; }
+        .badge-equity { background: #144552; }
+        .badge-hybrid { background: #999999; }
+        .badge-commodity { background: #68c7ca; }
+
+        .autocomplete-header {
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+<div class="page-container">
+
+    <div class="banner">Update MF Investments</div>
+
+    <div class="form-wrapper">
+        <form method="POST">
+
+            <input type="hidden" id="row_count" name="row_count" value="1">
+
+            <table id="txn_table">
+                <thead>
+                    <tr>
+                        <th>Fund</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>NAV</th>
+                        <th>Folio Number</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
+
+                <tbody id="txn_body">
+                    <tr>
+                        <td>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" name="fund_name_0" class="fund-input" autocomplete="off">
+                                <input type="hidden" name="fund_0" class="fund-id">
+                                <div class="autocomplete-box"></div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <select name="txn_type_0">
+                                <option value="buy">Buy</option>
+                                <option value="sell">Sell</option>
+                            </select>
+                        </td>
+
+                        <td>
+                            <input type="date" name="date_0" max="{{ date.today() }}">
+                        </td>
+
+                        <td>
+                            <input type="number" step="0.01" name="amount_0">
+                        </td>
+
+                        <td>
+                            <input type="number" step="0.0001" name="nav_0">
+                        </td>
+
+                        <td>
+                            <input type="text" name="folio_0">
+                        </td>
+
+                        <td>
+                            <button type="button" class="delete-row-btn">✖</button>
+                        </td>
+                    </tr>
+
+                </tbody>
+            </table>
+
+            <div class="btn-row">
+                <button type="button" class="btn-add" onclick="addRow()">Add More</button>
+                <button type="submit" formaction="/preview-transactions" class="btn-preview">Preview</button>
+                <button type="submit" class="btn-submit">Submit</button>
+            </div>
+
+        </form>
+    </div>
+
+</div>
+
+<!-- FULL AUTOCOMPLETE + ROW DELETE + ADD ROW JS -->
+<script>
+let rowIndex = 1;
+let fundCache = {};
+let recentFunds = [];
+const RECENT_KEY = "mfapp_recent_funds";
+
+function loadRecentFunds() {
+    try {
+        const stored = localStorage.getItem(RECENT_KEY);
+        recentFunds = stored ? JSON.parse(stored) : [];
+    } catch (e) { recentFunds = []; }
+}
+
+function saveRecentFunds() {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recentFunds)); }
+    catch (e) {}
+}
+
+loadRecentFunds();
+
+function addToRecent(fund) {
+    recentFunds = recentFunds.filter(r => r.id !== fund.id);
+    recentFunds.unshift(fund);
+    if (recentFunds.length > 5) recentFunds = recentFunds.slice(0, 5);
+    saveRecentFunds();
+}
+
+function addRow() {
+    const tbody = document.getElementById("txn_body");
+    const firstRow = tbody.rows[0];
+    const newRow = firstRow.cloneNode(true);
+
+    // Rename ALL input + select fields
+    newRow.querySelectorAll("input, select").forEach(el => {
+        const oldName = el.getAttribute("name");
+        if (!oldName) return;
+
+        const base = oldName.replace(/_\d+$/, "");
+        el.setAttribute("name", `${base}_${rowIndex}`);
+
+        // Clear values
+        el.value = "";
+
+        // Reset max date
+        if (el.type === "date") {
+            el.setAttribute("max", "{{ date.today() }}");
+        }
+    });
+
+    // Clear autocomplete results
+    const box = newRow.querySelector(".autocomplete-box");
+    if (box) box.innerHTML = "";
+
+    tbody.appendChild(newRow);
+
+    // Update row count
+    document.getElementById("row_count").value = rowIndex + 1;
+    rowIndex++;
+}
+
+document.addEventListener("click", function(e) {
+    if (e.target.classList.contains("delete-row-btn")) {
+        const row = e.target.closest("tr");
+        const tbody = document.getElementById("txn_body");
+
+        if (tbody.rows.length === 1) {
+            alert("At least one row is required.");
+            return;
+        }
+
+        row.remove();
+    }
+});
+
+function renderResults(input, box, hidden, results, isRecent = false) {
+    box.innerHTML = "";
+
+    if (isRecent && results.length > 0) {
+        const header = document.createElement("div");
+        header.textContent = "Recently used";
+        header.className = "autocomplete-header";
+        box.appendChild(header);
+    }
+
+    results.forEach((f, idx) => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.dataset.index = idx;
+        div.dataset.id = f.id;
+        div.dataset.name = f.name;
+        div.dataset.category = f.category || "";
+
+        const catClass = (f.category || "").toLowerCase();
+
+        div.innerHTML = `
+            <span>${f.name}</span>
+            ${f.category ? `<span class="badge badge-${catClass}">${f.category}</span>` : ""}
+        `;
+
+        div.onclick = () => {
+            input.value = f.name;
+            hidden.value = f.id;
+            addToRecent(f);
+            box.innerHTML = "";
+        };
+
+        box.appendChild(div);
+    });
+}
+
+document.addEventListener("input", function(e) {
+    if (!e.target.classList.contains("fund-input")) return;
+
+    const input = e.target;
+    const wrapper = input.closest(".autocomplete-wrapper");
+    const hidden = wrapper.querySelector(".fund-id");
+    const box = wrapper.querySelector(".autocomplete-box");
+
+    const q = input.value.trim();
+
+    if (q.length < 2) {
+        hidden.value = "";
+        if (recentFunds.length > 0) renderResults(input, box, hidden, recentFunds, true);
+        else box.innerHTML = "";
+        return;
+    }
+
+    if (fundCache[q]) {
+        renderResults(input, box, hidden, fundCache[q], false);
+        return;
+    }
+
+    fetch(`/fund-search?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            fundCache[q] = data.results;
+            renderResults(input, box, hidden, data.results, false);
+        });
+});
+
+document.addEventListener("keydown", function(e) {
+    if (!e.target.classList.contains("fund-input")) return;
+
+    const input = e.target;
+    const wrapper = input.closest(".autocomplete-wrapper");
+    const box = wrapper.querySelector(".autocomplete-box");
+    const items = box.querySelectorAll(".autocomplete-item");
+    if (!items.length) return;
+
+    let currentIndex = -1;
+    items.forEach((item, idx) => {
+        if (item.classList.contains("active")) currentIndex = idx;
+    });
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+        items.forEach(i => i.classList.remove("active"));
+        items[next].classList.add("active");
+    } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+        items.forEach(i => i.classList.remove("active"));
+        items[prev].classList.add("active");
+    } else if (e.key === "Enter") {
+        const active = items[currentIndex >= 0 ? currentIndex : 0];
+        if (active) {
+            e.preventDefault();
+            const hidden = wrapper.querySelector(".fund-id");
+            const fund = {
+                id: parseInt(active.dataset.id, 10),
+                name: active.dataset.name,
+                category: active.dataset.category || "",
+            };
+            input.value = fund.name;
+            hidden.value = fund.id;
+            addToRecent(fund);
+            box.innerHTML = "";
+        }
+    }
+});
+
+document.addEventListener("click", function(e) {
+    if (!e.target.closest(".autocomplete-wrapper")) {
+        document.querySelectorAll(".autocomplete-box").forEach(box => box.innerHTML = "");
+    }
+});
+</script>
+
+<div style="
+    position: fixed;
+    bottom: 20px;
+    right: 25px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.95em;
+    background: rgba(189, 232, 245, 0.55);
+    padding: 8px 14px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    transition: background 0.25s ease, transform 0.25s ease;
+"
+onmouseover="this.style.background='rgba(189, 232, 245, 0.9)'; this.style.transform='scale(1.05)';"
+onmouseout="this.style.background='rgba(189, 232, 245, 0.55)'; this.style.transform='scale(1.0)';"
+>
+    <a href="{{ url_for('dashboard_bp.dashboard', user_id=user.id) }}"
+       style="color: #22577A; text-decoration: none; font-weight: 600;">
+        View Personal Dashboard
+    </a>
+</div>
+
+</body>
+</html>

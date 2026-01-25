@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Last NAV Update Status</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px 0;
+            background-image: url("{{ url_for('static', filename='images/dashboard_background_alt.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        .banner {
+            background-color: #16476A;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 2.2em;
+            font-weight: bold;
+            border-radius: 12px;
+            margin: 0 auto 40px auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            font-family: 'Nunito', sans-serif;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+            background: rgba(255, 255, 255, 0.80); /* 80% transparent */
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background-color: #58A0C8;
+            color: white;
+            padding: 12px;
+            font-size: 1.05em;
+            text-align: left;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        td.nav-value {
+            text-align: right;
+        }
+
+        td.stale-date {
+            color: red;
+            font-weight: 500;
+        }
+
+        tr:hover {
+            background-color: rgba(217, 234, 253, 0.8);
+        }
+
+        .return-link {
+            display: inline-block;
+            margin-top: 20px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            color: #22577A;
+            text-decoration: none;
+            font-size: 1.05em;
+        }
+
+        .return-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="dashboard-container">
+
+    <div class="banner">Last NAV Update Status</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Fund Name</th>
+                <th>ISIN</th>
+                <th>Last NAV Date</th>
+                <th style="text-align:right;">Last NAV Value</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for row in rows %}
+            {% set nav_date = row.latest_nav_date %}
+            {% set is_stale = nav_date and ( ( (now.date() - nav_date).days ) > 30 ) %}
+            <tr>
+                <td>{{ row.fund_name }}</td>
+                <td>{{ row.isin }}</td>
+                <td class="{{ 'stale-date' if is_stale else '' }}">
+                    {% if nav_date %}
+                        {{ nav_date.strftime('%d-%m-%Y') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="nav-value">
+                    {% if row.latest_nav_value is not none %}
+                        {{ "%.4f"|format(row.latest_nav_value) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a class="return-link" href="{{ url_for('family_dashboard_bp.family_dashboard') }}">
+        Return to Family Dashboard
+    </a>
+
+</div>
+
+</body>
+</html>

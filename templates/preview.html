@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Preview Upload – fundMetrics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url("{{ url_for('static', filename='images/dashboard_background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        .banner {
+            font-family: 'Nunito', sans-serif;
+            background-color: #38A3A5;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 2.2em;
+            font-weight: bold;
+            border-radius: 12px;
+            margin: 20px auto;
+            max-width: 1600px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .page-wrapper {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        h2 {
+            font-family: 'Nunito', sans-serif;
+            color: #22577A;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px 12px;
+            font-size: 0.95em;
+        }
+
+        th {
+            background-color: #22577A;
+            color: white;
+            font-weight: 600;
+            text-align: left;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background-color: #38A3A5;
+            color: white;
+            padding: 14px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary:hover {
+            background-color: #2d8284;
+        }
+
+        .section-title {
+            font-family: 'Nunito', sans-serif;
+            color: #22577A;
+            margin-top: 40px;
+            margin-bottom: 10px;
+            font-size: 1.4em;
+            font-weight: 700;
+        }
+
+        .warning-table th {
+            background-color: #ffcc00;
+            color: black;
+        }
+
+        .danger-table th {
+            background-color: #ff4d4d;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="banner">Preview Uploaded Data</div>
+
+    <div class="page-wrapper">
+        <div class="container">
+
+            <!-- MUTUAL FUND PREVIEW (CAMS/Karvy) -->
+            {% if preview_data and registrar %}
+                <h2>{{ registrar }} Statement Preview</h2>
+
+                <table>
+                    <thead>
+                        <tr>
+                            {% for col in preview_data[0].keys() %}
+                                <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_data %}
+                            <tr>
+                                {% for value in row.values() %}
+                                    <td>{{ value }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                {% if registrar in ['Karvy', 'CAMS'] %}
+
+                <div style="display: flex; gap: 20px; align-items: center; margin-top: 20px;">
+
+                    <span id="preview-sync-nav-check"
+                          style="display:none; font-size: 1.6rem; color: #2ecc71; margin-right: 8px;">
+                        ✔
+                    </span>
+
+                    <button id="preview-sync-nav-btn" class="btn-primary"
+                            style="width: auto !important; padding: 14px 20px; background-color:#22577A;">
+                        <span id="preview-sync-nav-spinner"
+                              class="spinner-border spinner-border-sm me-2"
+                              style="display:none;"></span>
+                        Sync NAV Now
+                    </button>
+
+                    <form method="POST" action="{{ url_for('confirm_upload') }}">
+                        <button id="confirm-upload-btn" type="submit" class="btn-primary" disabled
+                                style="opacity: 0.6; cursor: not-allowed;">
+                            Confirm Upload
+                        </button>
+                    </form>
+
+                </div>
+
+
+                <!-- Inline status message -->
+                <div id="preview-sync-nav-status"
+                     style="margin-top: 10px; font-size: 0.9rem; color: #444;"></div>
+                {% endif %}
+
+            {% endif %}
+
+
+            <!-- COMMODITY PREVIEW -->
+            {% if preview_data_valid %}
+                <h2>Commodity Upload Preview</h2>
+
+                <table>
+                    <thead>
+                        <tr>
+                            {% for col in preview_data_valid[0].keys() %}
+                                <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_data_valid %}
+                            <tr>
+                                {% for value in row.values() %}
+                                    <td>{{ value }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+
+            {% if preview_data_missing_isin %}
+                <div class="section-title">Skipped Rows – Missing ISIN</div>
+                <table class="warning-table">
+                    <thead>
+                        <tr>
+                            {% for col in preview_data_missing_isin[0].keys() %}
+                                <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_data_missing_isin %}
+                            <tr>
+                                {% for value in row.values() %}
+                                    <td>{{ value }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            {% if preview_data_unmapped %}
+                <div class="section-title">Skipped Rows – Fund Not Found</div>
+                <table class="danger-table">
+                    <thead>
+                        <tr>
+                            {% for col in preview_data_unmapped[0].keys() %}
+                                <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in preview_data_unmapped %}
+                            <tr>
+                                {% for value in row.values() %}
+                                    <td>{{ value }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+        </div>
+    </div>
+
+<script>
+document.getElementById("preview-sync-nav-btn")?.addEventListener("click", function () {
+    const btn = document.getElementById("preview-sync-nav-btn");
+    const spinner = document.getElementById("preview-sync-nav-spinner");
+    const status = document.getElementById("preview-sync-nav-status");
+    const confirmBtn = document.getElementById("confirm-upload-btn");
+    const check = document.getElementById("preview-sync-nav-check");
+
+    // Reset tick
+    check.style.display = "none";
+
+    // Disable Sync button + show spinner
+    btn.disabled = true;
+    btn.style.opacity = "0.6";
+    spinner.style.display = "inline-block";
+    status.textContent = "Syncing NAVs…";
+
+    fetch("/preview-sync-nav", { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+            spinner.style.display = "none";
+
+            const updated = Array.isArray(data.synced) ? data.synced.length : 0;
+            const errorsCount = Array.isArray(data.errors) ? data.errors.length : 0;
+
+            if (data.status === "success" || data.status === "partial") {
+                status.textContent = `NAV sync complete. Updated: ${updated}, Errors: ${errorsCount}`;
+                status.style.color = "green";
+
+                check.style.display = "inline-block";
+
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = "1";
+                confirmBtn.style.cursor = "pointer";
+            } else {
+                status.textContent = `NAV sync failed. Errors: ${errorsCount}`;
+                status.style.color = "red";
+            }
+
+            btn.disabled = false;
+            btn.style.opacity = "1";
+        })
+        .catch(err => {
+            console.error(">>> FRONTEND ERROR:", err);
+            spinner.style.display = "none";
+            status.style.color = "red";
+            status.textContent = "Error syncing NAVs";
+            btn.disabled = false;
+            btn.style.opacity = "1";
+        });
+});
+</script>
