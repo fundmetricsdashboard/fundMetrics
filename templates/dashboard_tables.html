@@ -118,6 +118,10 @@
                    style="color: #22577A; text-decoration: none; margin: 0 10px;">
                     Add Transactions
                 </a> |
+                <a href="{{ url_for('upload_center') }}"
+                   style="color: #22577A; text-decoration: none; margin: 0 10px;"> 
+                    Bulk Upload 
+                </a> |
                 <a href="{{ url_for('dashboard_tables_bp.confirm_deletion', user_id=user.id, registrar='CAMS') }}"
                    style="color: #22577A; text-decoration: none; margin: 0 10px;">
                     Reset CAMS Data

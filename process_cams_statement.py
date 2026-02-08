@@ -15,11 +15,6 @@ def process_cams_statement(filepath, user_id, preview=False):
     df = pd.read_excel(filepath, sheet_name="Sheet1")
     df.columns = [c.strip() for c in df.columns]
 
-    print(f"[CAMS DEBUG] Columns found: {df.columns.tolist()}")
-    print(f"[CAMS DEBUG] Total rows: {len(df)}")
-    if len(df) > 0:
-        print(f"[CAMS DEBUG] First row: {df.iloc[0].to_dict()}")
-
     parsed_rows = []
     skipped = []
     inserted = 0
@@ -76,7 +71,7 @@ def process_cams_statement(filepath, user_id, preview=False):
                 continue
 
             # Strict parsing
-            txn_date = pd.to_datetime(row.get("Date"), dayfirst=True).date()
+            txn_date = pd.to_datetime(row.get("Date"), format="%Y-%m-%d").date()
             amount = float(row.get("Amount"))
             units = float(row.get("Units"))
             nav = float(row.get("Price"))

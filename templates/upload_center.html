@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Upload Center – fundMetrics</title>
+
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
     <style>
+        /* Page Background */
         body {
             font-family: 'Roboto', sans-serif;
             margin: 0;
@@ -18,6 +21,7 @@
             min-height: 100vh;
         }
 
+        /* Banner */
         .banner {
             font-family: 'Nunito', sans-serif;
             background-color: #38A3A5;
@@ -32,6 +36,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
 
+        /* Layout */
         .page-wrapper {
             display: flex;
             align-items: center;
@@ -49,6 +54,7 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
+        /* Headings */
         h2 {
             font-family: 'Nunito', sans-serif;
             color: #22577A;
@@ -64,6 +70,7 @@
             font-size: 0.95em;
         }
 
+        /* Upload Sections */
         .upload-section {
             margin-bottom: 30px;
         }
@@ -76,8 +83,14 @@
             margin-bottom: 8px;
         }
 
-        input[type="file"] {
+        /* Wrapper to force file input width to match button width */
+        .upload-wrapper {
             width: 100%;
+        }
+
+        .upload-wrapper input[type="file"] {
+            width: 100%;
+            box-sizing: border-box;
             padding: 12px;
             margin-bottom: 15px;
             border: 1px solid #ccc;
@@ -85,6 +98,7 @@
             background: white;
         }
 
+        /* Buttons */
         button {
             width: 100%;
             background-color: #38A3A5;
@@ -104,6 +118,7 @@
             background-color: #2d8284;
         }
 
+        /* Flash Messages */
         .flash-messages {
             margin-bottom: 20px;
             padding: 12px 15px;
@@ -122,6 +137,7 @@
     </style>
 </head>
 
+
 <body>
 
     <div class="banner">Upload Center</div>
@@ -130,7 +146,7 @@
         <div class="container">
 
             <h2>Upload Your Data</h2>
-            <p class="subtitle">Choose the type of file you want to upload</p>
+            <p class="subtitle">Choose the type of statement you want to upload</p>
 
             <!-- Flash Messages -->
             {% with messages = get_flashed_messages() %}
@@ -147,7 +163,9 @@
             <div class="upload-section">
                 <label>CAMS Statement Upload</label>
                 <form action="{{ url_for('upload_cams_statement') }}" method="POST" enctype="multipart/form-data">
-                    <input type="file" name="statement_file" required>
+                    <div class="upload-wrapper">
+                        <input type="file" name="statement_file" required>
+                    </div>
                     <button type="submit">Upload CAMS Statement</button>
                 </form>
             </div>
@@ -156,7 +174,9 @@
             <div class="upload-section">
                 <label>Karvy Statement Upload</label>
                 <form action="{{ url_for('upload_karvy_statement') }}" method="POST" enctype="multipart/form-data">
-                    <input type="file" name="statement_file" required>
+                    <div class="upload-wrapper">
+                        <input type="file" name="statement_file" required>
+                    </div>
                     <button type="submit">Upload Karvy Statement</button>
                 </form>
             </div>
@@ -165,9 +185,33 @@
             <div class="upload-section">
                 <label>Commodity Excel Upload</label>
                 <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data">
-                    <input type="file" name="excel_file" required>
+                    <div class="upload-wrapper">
+                        <input type="file" name="excel_file" required>
+                    </div>
                     <button type="submit">Upload Commodity Excel</button>
                 </form>
+            </div>
+
+            <!-- Cancel + Logout Row -->
+            <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+
+                {% if has_data %}
+                    <a href="{{ url_for('dashboard_tables_bp.dashboard_tables', user_id=user.id) }}"
+                       style="color: #22577A; font-weight: 600; text-decoration: none; font-family: 'Nunito', sans-serif;">
+                        ← Cancel
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('upload_center') }}"
+                       style="color: #22577A; font-weight: 600; text-decoration: none;">
+                        ← Cancel
+                    </a>
+                {% endif %}
+
+                <a href="{{ url_for('logout') }}"
+                   style="color: #22577A; font-weight: 600; text-decoration: none; font-family: 'Nunito', sans-serif;">
+                    Cancel & Logout →
+                </a>
+
             </div>
 
         </div>

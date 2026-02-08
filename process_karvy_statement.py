@@ -36,6 +36,7 @@ def process_karvy_statement(filepath, user_id, preview=False):
     # Transaction description mapping
     txn_map = {
         "purchase": "buy",
+        "buy": "buy",
         "additional purchase": "buy",
         "sys. investment": "buy",
         "switch in": "buy",
@@ -46,6 +47,7 @@ def process_karvy_statement(filepath, user_id, preview=False):
         "switch over in": "buy",
 
         "redemption": "sell",
+        "sell": "sell",
         "redemption(nav dt": "sell",
         "switch out": "sell",
         "lateral shift out": "sell",

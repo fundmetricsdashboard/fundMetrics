@@ -164,7 +164,14 @@ def upload():
 @app.route('/upload-center')
 @login_required 
 def upload_center(): 
-    return render_template('upload_center.html')
+    # Check if user has any investment data
+    has_data = Investment.query.filter_by(user_id=current_user.id).count() > 0
+
+    return render_template(
+        'upload_center.html',
+        user=current_user,
+        has_data=has_data
+    )
 
 
 # ===========================
