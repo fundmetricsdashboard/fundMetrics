@@ -100,6 +100,7 @@ class Investment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    batch_id = db.Column(db.String(64), nullable=True)
     fund_id = db.Column(db.Integer, db.ForeignKey('fund.id'), nullable=True)
     isin = db.Column(db.String(20), nullable=True)
     transaction_type = db.Column(db.String(20), nullable=False)
