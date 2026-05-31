@@ -125,11 +125,11 @@ def calculate_xirr(cash_flows, tol=1e-7, max_iter=100):
     # Economic guardrail: enforce sign consistency
     net_gain = total_in - total_out
     if net_gain > 0 and rate < 0:
-        return 0.0
+        return None  # Let the UI know it failed
     if net_gain < 0 and rate > 0:
-        return 0.0
+        return None  # Let the UI know it failed
 
-    return float(rate) if not isinstance(rate, complex) else 0.0
+    return float(rate) if not isinstance(rate, complex) else None
 
 
 
@@ -230,8 +230,8 @@ def calculate_fifo_returns(transactions, latest_nav, today=None):
             cash_flows.append((t.date, -float(t.amount or 0)))
 
         elif t.transaction_type.lower() == 'sell':
-            units_to_sell = abs(float(t.units or 0))  # ✅ normalize units
-            cash_flows.append((t.date, abs(float(t.amount or 0))))  # ✅ treat amount as inflow
+            units_to_sell = abs(float(t.units or 0))  # normalize units
+            cash_flows.append((t.date, abs(float(t.amount or 0))))  # treat amount as inflow
 
             while units_to_sell > 0 and buy_lots:
                 lot = buy_lots[0]
@@ -267,11 +267,6 @@ def calculate_fifo_returns(transactions, latest_nav, today=None):
     if current_value > 0:
         cash_flows.append((today, current_value))
 
-    # Debug print
-    #print(">>> DEBUG CASH FLOWS FEED to XIRR")
-    #for dt, amt in sorted(cash_flows, key=lambda x: x[0]):
-    #    print(f"   {dt}  {amt:+,.2f}")
-
     absolute_return = current_value - remaining_cost
     xirr_val = calculate_xirr(cash_flows) if cash_flows else 0.0
 
@@ -286,3 +281,57 @@ def calculate_fifo_returns(transactions, latest_nav, today=None):
         "holding_period": holding_period_years    
     }
 
+
+# ===========================
+# Process Sell (FIFO Math)
+# ===========================
+def process_sell(session, user_id, fund_id, sell_date, sell_units, sell_price):
+    from models import InvestmentHistory
+    import decimal
+
+    # Convert to decimals to avoid rounding errors in financial math
+    units_to_sell = decimal.Decimal(str(sell_units))
+
+    # 1. Find all available 'BUY' lots for this fund, oldest first
+    available_buys = session.query(InvestmentHistory).filter(
+        InvestmentHistory.user_id == user_id,
+        InvestmentHistory.fund_id == fund_id,
+        InvestmentHistory.tx_type == 'BUY',
+        InvestmentHistory.units_remaining > 0,
+        InvestmentHistory.tx_date <= sell_date
+    ).order_by(InvestmentHistory.tx_date.asc()).all()
+
+    total_available = sum(buy.units_remaining for buy in available_buys)
+
+    # 2. Safety check: Do we have enough units to sell?
+    if units_to_sell > total_available + decimal.Decimal('0.0001'):
+        raise ValueError(f"Not enough units to sell on {sell_date}.")
+
+    # 3. Deduct units from oldest buys (First-In, First-Out)
+    for buy in available_buys:
+        if units_to_sell <= 0:
+            break
+            
+        if buy.units_remaining <= units_to_sell:
+            # Exhaust this entire buy lot
+            units_to_sell -= buy.units_remaining
+            buy.units_remaining = 0
+        else:
+            # Partially exhaust this buy lot
+            buy.units_remaining -= units_to_sell
+            units_to_sell = 0
+            
+    # 4. Record the SELL transaction in history
+    sell_record = InvestmentHistory(
+        user_id=user_id,
+        fund_id=fund_id,
+        tx_date=sell_date,
+        tx_type='SELL',
+        units=sell_units,
+        cost_per_unit=sell_price if sell_price else 0.0,
+        total_cost=float(sell_units) * float(sell_price if sell_price else 0.0),
+        units_remaining=0  # Sells don't have remaining units to carry forward
+    )
+    session.add(sell_record)
+    
+    # Note: We rely on the file calling this function to save (commit) to the database.

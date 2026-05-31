@@ -51,11 +51,35 @@ def send_email(subject, recipients, body):
     mail.send(msg)
 
 def generate_reset_token(user_id):
-    return serializer.dumps(user_id, salt='password-reset-salt')
+    from models import PasswordResetToken
+    from datetime import datetime, timedelta
+    
+    token = serializer.dumps(user_id, salt='password-reset-salt')
+    
+    # Save the ticket to the database so we can track it
+    db_token = PasswordResetToken(
+        user_id=user_id,
+        token=token,
+        expires_at=datetime.utcnow() + timedelta(hours=1),
+        used=False
+    )
+    db.session.add(db_token)
+    db.session.commit()
+    
+    return token
 
-def verify_reset_token(token, expiration=3600):
+def verify_reset_token(token):
+    from models import PasswordResetToken
+    from datetime import datetime
+    
+    # Check if token exists, is unused, and hasn't expired in the vault
+    db_token = PasswordResetToken.query.filter_by(token=token, used=False).first()
+    if not db_token or db_token.expires_at < datetime.utcnow():
+        return None
+        
     try:
-        user_id = serializer.loads(token, salt='password-reset-salt', max_age=expiration)
+        # Verify the digital signature
+        user_id = serializer.loads(token, salt='password-reset-salt', max_age=3600)
         return user_id
     except Exception:
         return None
@@ -93,17 +117,13 @@ configure_database(app)
 # ===========================
 # Blueprint Registration (final & safe)
 # ===========================
-try:
-    from routes_dashboard import dashboard_bp
-    from routes_dashboard_tables import dashboard_tables_bp
-    from routes_family_dashboard import family_dashboard_bp
+from routes_dashboard import dashboard_bp
+from routes_dashboard_tables import dashboard_tables_bp
+from routes_family_dashboard import family_dashboard_bp
 
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(dashboard_tables_bp)
-    app.register_blueprint(family_dashboard_bp)
-
-except Exception as e:
-    print(f"Blueprint warning: {e}")
+app.register_blueprint(dashboard_bp)
+app.register_blueprint(dashboard_tables_bp)
+app.register_blueprint(family_dashboard_bp)
 
 
 # ===========================
@@ -905,10 +925,12 @@ def reset_password():
 
 @app.route('/reset/<token>', methods=['GET', 'POST'])
 def reset_with_token(token):
+    from models import PasswordResetToken
+    
     user_id = verify_reset_token(token)
 
     if not user_id:
-        flash("❌ Invalid or expired reset link.")
+        flash("❌ Invalid, used, or expired reset link.")
         return redirect(url_for('reset_password'))
 
     user = User.query.get(user_id)
@@ -916,6 +938,12 @@ def reset_with_token(token):
     if request.method == 'POST':
         new_password = request.form['new_password']
         user.set_password(new_password)
+        
+        # Cross the token off the list so it can never be used again!
+        db_token = PasswordResetToken.query.filter_by(token=token).first()
+        if db_token:
+            db_token.used = True
+            
         db.session.commit()
 
         flash("✅ Password updated successfully.")

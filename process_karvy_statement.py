@@ -5,7 +5,7 @@ from db_config import db
 from models import Fund, StagingInvestment
 
 
-def process_karvy_statement(filepath, user_id, preview=False):
+def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
     """
     Karvy statement parser.
 
@@ -31,7 +31,7 @@ def process_karvy_statement(filepath, user_id, preview=False):
 
     # Clear old staging rows in preview mode
     if preview:
-        StagingInvestment.query.filter_by(user_id=user_id).delete()
+        StagingInvestment.query.filter_by(user_id=user_id, batch_id=batch_id).delete()
 
     # Transaction description mapping
     txn_map = {
@@ -100,6 +100,7 @@ def process_karvy_statement(filepath, user_id, preview=False):
             # Insert into staging (preview OR commit mode)
             staging = StagingInvestment(
                 user_id=user_id,
+                batch_id=batch_id,
                 isin=isin,
                 date=txn_date,
                 amount=amount,

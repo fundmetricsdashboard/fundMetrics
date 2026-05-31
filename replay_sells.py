@@ -1,3 +1,6 @@
+from models import db, Investment, InvestmentHistory
+from utils import process_sell
+
 def replay_sells(user_id: int, registrar: str = None):
     q = db.session.query(Investment).filter(
         Investment.user_id == user_id,

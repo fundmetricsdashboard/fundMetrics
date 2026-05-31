@@ -375,10 +375,12 @@ def dashboard_tables(user_id):
     endpoint="confirm_deletion"
 )
 def confirm_deletion(user_id, registrar):
+    from snapshot_generator import generate_personal_snapshots, generate_family_snapshots
+
     user = User.query.get_or_404(user_id)
 
-    if registrar not in {"CAMS", "Karvy"}:
-        flash("❌ Invalid registrar.")
+    if registrar not in {"CAMS", "Karvy", "Commodity", "Manual"}:
+        flash("❌ Invalid deletion target.")
         return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=user.id))
 
     if request.method == "POST":
@@ -387,69 +389,97 @@ def confirm_deletion(user_id, registrar):
             flash("❌ Please provide a reason for deletion.")
             return redirect(request.url)
 
-        # Normalize registrar for filename matching
-        registrar_lower = registrar.lower()
+        # 1. Identify which rows to delete based on source
+        if registrar == "Manual":
+            investments_to_delete = Investment.query.filter(
+                Investment.user_id == user.id,
+                Investment.source_file == "manual_entry"
+            ).all()
+        else:
+            registrar_lower = registrar.lower()
+            investments_to_delete = Investment.query.filter(
+                Investment.user_id == user.id,
+                (
+                    (Investment.registrar == registrar) |
+                    (func.lower(Investment.source_file).like(f"%{registrar_lower}%"))
+                )
+            ).all()
 
-        # 1️⃣ Delete investments by registrar OR source_file
-        investments_to_delete = Investment.query.filter(
-            Investment.user_id == user.id,
-            (
-                (Investment.registrar == registrar) |
-                (func.lower(Investment.source_file).like(f"%{registrar_lower}%"))
-            )
-        ).all()
+        if not investments_to_delete:
+            flash(f"No {registrar} investments found to delete.")
+            return redirect(url_for("upload_center"))
 
-        investment_ids = [inv.id for inv in investments_to_delete]
+        # We must identify which specific funds are being affected
+        affected_fund_ids = list(set([inv.fund_id for inv in investments_to_delete if inv.fund_id]))
 
+        # Delete the raw investments
         for inv in investments_to_delete:
             db.session.delete(inv)
 
-        # 2️⃣ Delete FIFO rows tied to these investments
+        # 2. Rebuild the InvestmentHistory (FIFO math) for affected funds
+        # We must completely wipe and rebuild history ONLY for the funds whose buys/sells just changed
         histories_to_delete = InvestmentHistory.query.filter(
             InvestmentHistory.user_id == user.id,
-            InvestmentHistory.fund_id.isnot(None)  # only delete FIFO for matched funds
+            InvestmentHistory.fund_id.in_(affected_fund_ids)
         ).all()
 
-        # Also delete FIFO rows where fund_id is NULL (CAMS rows often have NULL fund_id)
-        histories_null = InvestmentHistory.query.filter(
-            InvestmentHistory.user_id == user.id,
-            InvestmentHistory.fund_id.is_(None)
-        ).all()
-
-        for hist in histories_to_delete + histories_null:
+        for hist in histories_to_delete:
             db.session.delete(hist)
 
-        # 3️⃣ Delete snapshots for this user (personal dashboard only)
-        snapshots_to_delete = PortfolioSnapshot.query.filter(
-            PortfolioSnapshot.user_id == user.id,
-            PortfolioSnapshot.dashboard_type == "personal"
-        ).all()
+        # Reconstruct the buy lots
+        remaining_investments = Investment.query.filter(
+            Investment.user_id == user.id,
+            Investment.fund_id.in_(affected_fund_ids)
+        ).order_by(Investment.date.asc()).all()
 
-        for snap in snapshots_to_delete:
-            db.session.delete(snap)
+        for inv in remaining_investments:
+            if inv.transaction_type.lower() == 'buy':
+                buy_record = InvestmentHistory(
+                    user_id=user.id,
+                    fund_id=inv.fund_id,
+                    tx_date=inv.date,
+                    tx_type='BUY',
+                    units=inv.units,
+                    cost_per_unit=inv.nav if inv.nav else 0.0,
+                    total_cost=float(inv.units) * float(inv.nav if inv.nav else 0.0),
+                    units_remaining=inv.units
+                )
+                db.session.add(buy_record)
 
-        # 4️⃣ Log deletion
+        # Process the remaining sells in chronological order
+        db.session.commit() # Commit the buys so process_sell can find them
+        
+        from utils import process_sell
+        for inv in remaining_investments:
+            if inv.transaction_type.lower() == 'sell':
+                try:
+                    process_sell(
+                        session=db.session,
+                        user_id=user.id,
+                        fund_id=inv.fund_id,
+                        sell_date=inv.date,
+                        sell_units=abs(float(inv.units)),
+                        sell_price=float(inv.nav) if inv.nav else 0.0
+                    )
+                except ValueError as e:
+                    # Log the error but don't crash if a sell now lacks sufficient buys
+                    print(f"Error rebuilding history after deletion: {e}")
+
+        # 3. Force Snapshot Regeneration
+        generate_personal_snapshots(user.id)
+        if user.family_id:
+            generate_family_snapshots(user.family_id)
+
+        # 4. Log deletion
         log = DeletionLog(
             user_id=user.id,
             registrar=registrar,
             reason=reason
         )
         db.session.add(log)
-
-        deleted_count = (
-            len(investments_to_delete)
-            + len(histories_to_delete)
-            + len(histories_null)
-            + len(snapshots_to_delete)
-        )
-
         db.session.commit()
 
-        flash(
-            f"✅ Reset {deleted_count} {registrar} records for user {user.id}. "
-            f"Reason: {reason}"
-        )
-
+        flash(f"✅ Successfully deleted {len(investments_to_delete)} {registrar} records and rebuilt historical ledgers. Reason: {reason}")
         return redirect(url_for("upload_center"))
 
     return render_template("confirm_deletion.html", user=user, registrar=registrar)

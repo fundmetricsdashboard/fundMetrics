@@ -5,7 +5,7 @@ from db_config import db
 from models import Fund, StagingInvestment
 
 
-def process_cams_statement(filepath, user_id, preview=False):
+def process_cams_statement(filepath, user_id, batch_id=None, preview=False):
     """
     Updated CAMS parser aligned with Karvy parser logic.
     Uses actual CAMS file headers:
@@ -20,7 +20,7 @@ def process_cams_statement(filepath, user_id, preview=False):
     inserted = 0
 
     if preview:
-        StagingInvestment.query.filter_by(user_id=user_id).delete()
+        StagingInvestment.query.filter_by(user_id=user_id, batch_id=batch_id).delete()
 
     txn_map = {
         "purchase": "buy",
@@ -84,6 +84,7 @@ def process_cams_statement(filepath, user_id, preview=False):
 
             staging = StagingInvestment(
                 user_id=user_id,
+                batch_id=batch_id,
                 isin=isin,
                 date=txn_date,
                 amount=amount,
