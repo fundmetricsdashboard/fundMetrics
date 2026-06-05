@@ -1,12 +1,11 @@
 # nav_loader.py
 
 import requests
-from datetime import date
+from datetime import date, timedelta
 from dateutil import parser
 from decimal import Decimal
 from calendar import monthrange
 from sqlalchemy.exc import IntegrityError
-
 from models import db, Fund, FundNAVHistory, Investment
 
 
@@ -34,7 +33,8 @@ def fetch_nav_history(scheme_code: str):
     resp = requests.get(url, timeout=10)
     if resp.status_code != 200:
         print(f"[MFAPI] HTTP {resp.status_code} for scheme {scheme_code}")
-        return []
+        # Raise an exception so the route knows the API failed
+        raise ConnectionError(f"MFAPI returned HTTP {resp.status_code}")
 
     data = resp.json() or {}
     return data.get("data", []) or []
@@ -80,32 +80,37 @@ def select_cutoff_navs(history):
 
 
 # ---------------------------------------------------------
-# Save NAVs (upsert)
+# Save NAVs (upsert) - REFACTORED FOR ATOMIC COMMITS
 # ---------------------------------------------------------
 def save_navs(fund: Fund, isin: str, cutoffs):
     for nav_date, nav_value in cutoffs:
-        entry = FundNAVHistory(
+        # Check memory/DB first to avoid IntegrityError
+        existing = FundNAVHistory.query.filter_by(
             fund_id=fund.id,
             nav_date=nav_date,
-            nav_value=nav_value,
             isin=isin,
-            nav_type="growth",
-        )
-        db.session.add(entry)
-        try:
-            db.session.commit()
-            print(f"[SAVE] {fund.name}: {nav_date} -> {nav_value}")
-        except IntegrityError:
-            db.session.rollback()
-            existing = FundNAVHistory.query.filter_by(
+        ).first()
+
+        if existing:
+            existing.nav_value = nav_value
+        else:
+            entry = FundNAVHistory(
                 fund_id=fund.id,
                 nav_date=nav_date,
+                nav_value=nav_value,
                 isin=isin,
-            ).first()
-            if existing:
-                existing.nav_value = nav_value
-                db.session.commit()
-                print(f"[UPDATE] {fund.name}: {nav_date} -> {nav_value}")
+                nav_type="growth",
+            )
+            db.session.add(entry)
+            
+    # Commit ONCE at the end of the loop
+    try:
+        db.session.commit()
+        print(f"[SAVE SUCCESS] {fund.name}: All cutoffs saved atomically.")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[SAVE FAILED] {fund.name}: Rolling back due to {str(e)}")
+        raise e  # Propagate to route to report the exact failure
 
 
 # ---------------------------------------------------------
@@ -146,19 +151,18 @@ def load_navs_for_fund(fund: Fund):
 # Load NAVs for all invested funds
 # ---------------------------------------------------------
 def load_all_funds():
-    funds = (
-        Fund.query
-        .join(Investment, Investment.fund_id == Fund.id)
-        .distinct()
-        .all()
-    )
+    # Fetch ALL funds that have a valid scheme code configured
+    funds = Fund.query.filter(Fund.scheme_code != None, Fund.scheme_code != '').all()
 
     total = len(funds)
-    print(f"[LOAD_ALL] Funds with investments: {total}")
+    print(f"[LOAD_ALL] Funds found to check: {total}")
 
     for idx, fund in enumerate(funds, start=1):
         print(f"\n[LOAD {idx}/{total}] {fund.name}")
-        load_navs_for_fund(fund)
+        try:
+            load_navs_for_fund(fund)
+        except Exception as e:
+            print(f"[ERROR] Failed to load {fund.name}: {e}")
 
 
 # ---------------------------------------------------------
@@ -167,17 +171,17 @@ def load_all_funds():
 def load_navs_for_fund_preview(fund: Fund):
     if not fund.scheme_code:
         print(f"[SKIP:NO_SCHEME] {fund.id} {fund.name}")
-        return "SKIP_NO_SCHEME"
+        raise ValueError("Fund is missing scheme_code")
 
     history = fetch_nav_history(fund.scheme_code)
     if not history:
         print(f"[MFAPI EMPTY] {fund.id} {fund.name}")
-        return "NO_HISTORY"
+        raise ValueError("MFAPI returned no history")
 
     cutoffs = select_cutoff_navs(history)
     if not cutoffs:
         print(f"[NO CUTOFFS] {fund.id} {fund.name}")
-        return "NO_CUTOFFS"
+        raise ValueError("No valid date cutoffs found")
 
     save_navs(fund, fund.isin, cutoffs)
     return "OK"
