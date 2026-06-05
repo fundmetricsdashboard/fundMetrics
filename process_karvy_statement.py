@@ -21,9 +21,19 @@ def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
         - Returns inserted/skipped counts
     """
 
-    # Load Excel
-    df = pd.read_excel(filepath, sheet_name="Sheet1")
-    df.columns = [c.strip() for c in df.columns]
+    # --- NEW FILE READING LOGIC ---
+    filename = filepath.lower()
+    
+    if filename.endswith('.csv'):
+        df = pd.read_csv(filepath)
+    elif filename.endswith(('.xls', '.xlsx')):
+        df = pd.read_excel(filepath, engine='openpyxl')
+    else:
+        raise ValueError("Unsupported file format. Please upload a .csv or .xlsx file.")
+    # ------------------------------
+
+    # Convert columns to strings before stripping to prevent CSV errors
+    df.columns = [str(c).strip() for c in df.columns]
 
     parsed_rows = []
     skipped = []
@@ -54,15 +64,18 @@ def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
         "switch over out": "sell"
     }
 
-
     for _, row in df.iterrows():
         try:
-            isin = str(row.get("SchemeISIN")).strip().upper() if row.get("SchemeISIN") else None
-            scheme_name = str(row.get("Scheme Description")).strip() if row.get("Scheme Description") else None
+            # Safely handle CSV empty cells (NaN)
+            raw_isin = row.get("SchemeISIN")
+            isin = str(raw_isin).strip().upper() if pd.notna(raw_isin) and str(raw_isin).strip().upper() != 'NONE' else None
+            
+            raw_scheme = row.get("Scheme Description")
+            scheme_name = str(raw_scheme).strip() if pd.notna(raw_scheme) else None
 
             # Missing ISIN → skip
             if not isin:
-                skipped.append((isin, scheme_name, "missing ISIN"))
+                skipped.append((str(raw_isin), scheme_name, "missing ISIN"))
                 continue
 
             fund = Fund.query.filter_by(isin=isin).first()
@@ -71,7 +84,8 @@ def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
                 continue
 
             # Classify transaction
-            desc = str(row.get("Transaction Description")).lower()
+            raw_desc = row.get("Transaction Description")
+            desc = str(raw_desc).lower() if pd.notna(raw_desc) else ""
             txn_type = None
 
             for key, value in txn_map.items():
@@ -89,7 +103,10 @@ def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
             amount = float(row.get("Amount"))
             units = float(row.get("Units"))
             nav = float(row.get("NAV"))
-            folio = str(row.get("Account Number"))
+            
+            raw_folio = row.get("Account Number")
+            folio = str(raw_folio) if pd.notna(raw_folio) else ""
+            
             source_file = os.path.basename(filepath)
 
             # Build row hash for duplicate detection
@@ -127,7 +144,7 @@ def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
             })
 
         except Exception as e:
-            skipped.append((row.get("SchemeISIN"), row.get("Scheme Description"), f"parse error: {e}"))
+            skipped.append((str(row.get("SchemeISIN")), str(row.get("Scheme Description")), f"parse error: {e}"))
             continue
 
     # Commit staging rows

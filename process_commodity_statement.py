@@ -1,4 +1,3 @@
-
 import os
 import hashlib
 import pandas as pd
@@ -6,8 +5,19 @@ from db_config import db
 from models import Fund, StagingInvestment
 
 def process_commodity_statement(filepath, user_id, preview=False):
-    df = pd.read_excel(filepath, sheet_name="Sheet1")
-    df.columns = [c.strip().lower() for c in df.columns]
+    # --- NEW FILE READING LOGIC ---
+    filename = filepath.lower()
+    
+    if filename.endswith('.csv'):
+        df = pd.read_csv(filepath)
+    elif filename.endswith(('.xls', '.xlsx')):
+        df = pd.read_excel(filepath, engine='openpyxl')
+    else:
+        raise ValueError("Unsupported file format. Please upload a .csv or .xlsx file.")
+    # ------------------------------
+
+    # Convert columns to strings before stripping/lowering to prevent CSV errors
+    df.columns = [str(c).strip().lower() for c in df.columns]
 
     parsed_rows = []
     skipped = []
@@ -18,9 +28,15 @@ def process_commodity_statement(filepath, user_id, preview=False):
 
     for _, row in df.iterrows():
         try:
-            isin = str(row.get("isin")).strip().upper()
+            # Safely handle CSV empty cells (NaN)
+            raw_isin = row.get("isin")
+            if pd.notna(raw_isin) and str(raw_isin).strip().upper() != 'NONE':
+                isin = str(raw_isin).strip().upper()
+            else:
+                isin = None
+
             if not isin:
-                skipped.append(("missing ISIN", row))
+                skipped.append(("missing ISIN", str(row.to_dict())))
                 continue
 
             fund = Fund.query.filter_by(isin=isin).first()
@@ -29,7 +45,7 @@ def process_commodity_statement(filepath, user_id, preview=False):
                 continue
 
             txn_date = pd.to_datetime(row.get("date"), dayfirst=True).date()
-            txn_type = str(row.get("transaction_type")).lower()
+            txn_type = str(row.get("transaction_type")).lower() if pd.notna(row.get("transaction_type")) else ""
             units = float(row.get("quantity"))
             nav = float(row.get("price"))
             amount = float(row.get("amount"))
@@ -73,4 +89,3 @@ def process_commodity_statement(filepath, user_id, preview=False):
         return parsed_rows
 
     return {"inserted": inserted, "skipped": skipped}
-

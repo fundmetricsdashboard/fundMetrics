@@ -425,99 +425,100 @@ def portfolio_history_data():
 @dashboard_bp.route("/preview-sync-nav", methods=["POST"])
 def preview_sync_nav():
     from nav_loader import load_navs_for_fund_preview
-    from models import Fund, FundNAVHistory
+    from models import Fund, FundNAVHistory, StagingInvestment
     from flask import session, jsonify
+    from flask_login import current_user
+    from db_config import db
+    import traceback
 
-    print(">>> ENTERED preview-sync-nav")
+    print(f">>> ENTERED preview-sync-nav for user {current_user.id}")
 
-    registrar = session.get("registrar")
+    try:
+        registrar = session.get("registrar")
 
-    # For CAMS/Karvy: get ISINs from staging table
-    if registrar in ("Karvy", "CAMS"):
-        isins = {
-            r.isin for r in StagingInvestment.query
-            .filter_by(user_id=current_user.id)
-            .distinct(StagingInvestment.isin)
-            .all()
-            if r.isin
-        }
-    else:
-        # For commodity: fallback to session
-        preview_data = session.get("preview_data")
-        if not preview_data:
-            print(">>> ERROR: No preview data in session")
+        # For CAMS/Karvy: get ISINs from staging table
+        if registrar in ("Karvy", "CAMS"):
+            # Fetch all rows, then use Python set comprehension to get unique ISINs
+            # This avoids the SQLite distinct() error
+            rows = StagingInvestment.query.filter_by(user_id=current_user.id).all()
+            isins = {r.isin for r in rows if r.isin}
+        else:
+            # For commodity: fallback to session
+            preview_data = session.get("preview_data")
+            if not preview_data:
+                print(">>> ERROR: No preview data in session")
+                return jsonify({
+                    "status": "error",
+                    "message": "No preview data found in session.",
+                    "synced": [],
+                    "errors": [],
+                    "nav_counts": {}
+                })
+            isins = {row.get("isin") for row in preview_data if row.get("isin")}
+
+        print(">>> ISINs extracted:", isins)
+
+        if not isins:
             return jsonify({
                 "status": "error",
-                "message": "No preview data found in session.",
+                "message": "No ISINs found to sync.",
                 "synced": [],
                 "errors": [],
                 "nav_counts": {}
             })
-        isins = {row.get("isin") for row in preview_data if row.get("isin")}
 
-    print(">>> ISINs extracted:", isins)
+        synced = []
+        errors = []
 
-    if not isins:
+        for isin in isins:
+            print(f">>> PROCESSING ISIN: {isin}")
+            fund = Fund.query.filter_by(isin=isin).first()
+
+            if not fund:
+                msg = f"{isin}: Fund not found in database"
+                errors.append(msg)
+                print(f">>> ERROR: {msg}")
+                continue
+
+            try:
+                print(f">>> CALLING PREVIEW LOADER FOR: {isin}")
+                result = load_navs_for_fund_preview(fund)
+                print(f">>> PREVIEW LOADER RESULT: {isin} -> {result}")
+                synced.append(isin)
+            except Exception as e:
+                # Catch errors for specific funds, but keep going!
+                msg = f"{isin}: Loader failed - {str(e)}"
+                errors.append(msg)
+                print(f">>> EXCEPTION DURING NAV LOAD: {msg}")
+
+        nav_counts = {}
+        for isin in isins:
+            fund = Fund.query.filter_by(isin=isin).first()
+            if fund:
+                count = (
+                    db.session.query(FundNAVHistory)
+                    .filter(FundNAVHistory.fund_id == fund.id)
+                    .count()
+                )
+                nav_counts[isin] = count
+
+        status = "success" if not errors else "partial"
+        print(f">>> FINAL STATUS: {status}")
+
         return jsonify({
-            "status": "error",
-            "message": "No ISINs found to sync.",
-            "synced": [],
-            "errors": [],
-            "nav_counts": {}
+            "status": status,
+            "message": f"NAV sync completed. Updated: {len(synced)}, Errors: {len(errors)}",
+            "synced": synced,
+            "errors": errors,
+            "nav_counts": nav_counts
         })
 
-    synced = []
-    errors = []
-
-    for isin in isins:
-        print(">>> PROCESSING ISIN:", isin)
-
-        fund = Fund.query.filter_by(isin=isin).first()
-        print(">>> FUND LOOKUP RESULT:", fund)
-
-        if not fund:
-            msg = f"{isin}: Fund not found"
-            errors.append(msg)
-            print(">>> ERROR:", msg)
-            continue
-
-        try:
-            print(">>> CALLING PREVIEW LOADER FOR:", isin)
-            result = load_navs_for_fund_preview(fund)
-            print(">>> PREVIEW LOADER RESULT:", isin, result)
-            synced.append(isin)
-        except Exception as e:
-            msg = f"{isin}: {str(e)}"
-            errors.append(msg)
-            print(">>> EXCEPTION DURING NAV LOAD:", msg)
-
-    nav_counts = {}
-    for isin in isins:
-        fund = Fund.query.filter_by(isin=isin).first()
-        if fund:
-            count = (
-                db.session.query(FundNAVHistory)
-                .filter(FundNAVHistory.fund_id == fund.id)
-                .count()
-            )
-            nav_counts[isin] = count
-
-    print(">>> NAV COUNTS:", nav_counts)
-
-    status = "success" if not errors else "partial"
-
-    print(">>> FINAL STATUS:", status)
-    print(">>> SYNCED:", synced)
-    print(">>> ERRORS:", errors)
-
-    return jsonify({
-        "status": status,
-        "message": (
-            f"NAV sync completed. "
-            f"Updated: {len(synced)}, "
-            f"Errors: {len(errors)}"
-        ),
-        "synced": synced,
-        "errors": errors,
-        "nav_counts": nav_counts
-    })
+    except Exception as e:
+        # THE VISIBILITY PATCH: Catch catastrophic errors and return them to the UI
+        db.session.rollback()
+        error_trace = traceback.format_exc()
+        print(f">>> CRITICAL ROUTE ERROR:\n{error_trace}")
+        return jsonify({
+            "status": "error",
+            "message": f"Server Error: {str(e)}"
+        }), 500

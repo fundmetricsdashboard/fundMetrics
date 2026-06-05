@@ -12,8 +12,19 @@ def process_cams_statement(filepath, user_id, batch_id=None, preview=False):
     FundName, Date, Transaction, ISIN, Amount, Units, Price, FolioNo
     """
 
-    df = pd.read_excel(filepath, sheet_name="Sheet1")
-    df.columns = [c.strip() for c in df.columns]
+    # --- NEW FILE READING LOGIC ---
+    filename = filepath.lower()
+    
+    if filename.endswith('.csv'):
+        df = pd.read_csv(filepath)
+    elif filename.endswith(('.xls', '.xlsx')):
+        df = pd.read_excel(filepath, engine='openpyxl')
+    else:
+        raise ValueError("Unsupported file format. Please upload a .csv or .xlsx file.")
+    # ------------------------------
+
+    # Convert columns to strings before stripping to prevent errors with empty/weird CSV headers
+    df.columns = [str(c).strip() for c in df.columns]
 
     parsed_rows = []
     skipped = []
@@ -45,10 +56,10 @@ def process_cams_statement(filepath, user_id, batch_id=None, preview=False):
     for _, row in df.iterrows():
         try:
             # Correct headers
-            isin = str(row.get("ISIN")).strip().upper() if row.get("ISIN") else None
-            scheme_name = str(row.get("FundName")).strip() if row.get("FundName") else None
+            isin = str(row.get("ISIN")).strip().upper() if pd.notna(row.get("ISIN")) else None
+            scheme_name = str(row.get("FundName")).strip() if pd.notna(row.get("FundName")) else None
 
-            if not isin:
+            if not isin or isin == 'NONE':
                 skipped.append((isin, scheme_name, "missing ISIN"))
                 continue
 
@@ -58,7 +69,7 @@ def process_cams_statement(filepath, user_id, batch_id=None, preview=False):
                 continue
 
             # Transaction classification
-            desc = str(row.get("Transaction")).lower()
+            desc = str(row.get("Transaction")).lower() if pd.notna(row.get("Transaction")) else ""
             txn_type = None
 
             for key, value in txn_map.items():
@@ -71,7 +82,7 @@ def process_cams_statement(filepath, user_id, batch_id=None, preview=False):
                 continue
 
             # Strict parsing
-            txn_date = pd.to_datetime(row.get("Date"), format="%Y-%m-%d").date()
+            txn_date = pd.to_datetime(row.get("Date")).date()
             amount = float(row.get("Amount"))
             units = float(row.get("Units"))
             nav = float(row.get("Price"))
