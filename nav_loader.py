@@ -151,11 +151,16 @@ def load_navs_for_fund(fund: Fund):
 # Load NAVs for all invested funds
 # ---------------------------------------------------------
 def load_all_funds():
-    # Fetch ALL funds that have a valid scheme code configured
-    funds = Fund.query.filter(Fund.scheme_code != None, Fund.scheme_code != '').all()
+    # Only grab funds that exist in the user's investment ledger
+    funds = (
+        Fund.query
+        .join(Investment, Investment.fund_id == Fund.id)
+        .distinct()
+        .all()
+    )
 
     total = len(funds)
-    print(f"[LOAD_ALL] Funds found to check: {total}")
+    print(f"[LOAD_ALL] Funds with investments: {total}")
 
     for idx, fund in enumerate(funds, start=1):
         print(f"\n[LOAD {idx}/{total}] {fund.name}")
