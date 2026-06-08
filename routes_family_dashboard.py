@@ -108,16 +108,20 @@ def aggregate_family_investments(family_users):
         summary_xirr
     )
 # ---------------------------------------------------------
-# Helper: Category-level pie chart
+# Helper: Category-level pie chart (Fixed)
 # ---------------------------------------------------------
 def build_family_category_breakup(aggregated):
     category_totals = {}
 
     for data in aggregated.values():
         cat = data["category"]
-        category_totals.setdefault(cat, 0)
-        category_totals[cat] += data["current_value"]
+        
+        # 1. APPLY FILTER: Only process the core 4 categories
+        if cat in ["Equity", "Debt", "Hybrid", "Commodity"]:
+            category_totals.setdefault(cat, 0)
+            category_totals[cat] += data["current_value"]
 
+    # 2. Keep your original list conversions!
     labels = list(category_totals.keys())
     full_values = list(category_totals.values())
     values_in_millions = [v / 1e6 for v in full_values]
@@ -128,13 +132,20 @@ def build_family_category_breakup(aggregated):
 # ---------------------------------------------------------
 # Helper: Subcategory bar chart
 # ---------------------------------------------------------
+
 def build_family_subcategory_breakup(aggregated):
     subcat_totals = {}
+    
+    # Calculate denominator based on all funds to keep percentages accurate
     total_value = sum(d["current_value"] for d in aggregated.values()) or 1
 
     for data in aggregated.values():
         sub = data["subcategory"]
         cat = data["category"]
+
+        # 1. APPLY FILTER: Ignore "Other" or "Unknown" categories
+        if cat not in ["Equity", "Debt", "Hybrid", "Commodity"]:
+            continue
 
         subcat_totals.setdefault(sub, {
             "subcategory": sub,
@@ -143,27 +154,26 @@ def build_family_subcategory_breakup(aggregated):
         })
         subcat_totals[sub]["amount"] += data["current_value"]
 
-    # Compute percentages
-    for v in subcat_totals.values():
-        v["percent"] = (v["amount"] / total_value) * 100
+    grouped_subcategories = []
+    
+    # 2. PERFECT SYNC: Group and sort exactly like the personal dashboard
+    for category in ["Equity", "Hybrid", "Debt", "Commodity"]:
+        subcats = [
+            {
+                "subcategory": v["subcategory"],
+                "category": v["category"],
+                "amount": round(v["amount"], 2),
+                "percent": round((v["amount"] / total_value) * 100, 1)
+            }
+            for v in subcat_totals.values()
+            if v["category"] == category
+        ]
+        
+        # 3. FIX SORT: Largest amounts first
+        subcats.sort(key=lambda x: x["amount"], reverse=True)
+        grouped_subcategories.extend(subcats)
 
-    # Manual category priority
-    category_priority = {
-        "Debt": 1,
-        "Equity": 2,
-        "Commodity": 3
-    }
-
-    # Deterministic multi-level sort
-    sorted_list = sorted(
-        subcat_totals.values(),
-        key=lambda x: (
-            category_priority.get(x["category"], 999),
-            x["amount"]
-        )
-    )
-
-    return sorted_list
+    return grouped_subcategories
 
 
 # ---------------------------------------------------------

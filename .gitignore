@@ -1,3 +1,4 @@
+# Python & Flask Defaults
 venv/
 __pycache__/
 *.pyc
@@ -5,3 +6,11 @@ instance/
 .env
 *.sqlite3
 *.db
+
+# Security & SSH Keys
+*.key
+*.pub
+
+# Personal Data & Uploads
+fundMetrics_uploads/
+seed_data.sql
