@@ -129,7 +129,7 @@ def calculate_xirr(cash_flows, tol=1e-7, max_iter=100):
     if net_gain < 0 and rate > 0:
         return None  # Let the UI know it failed
 
-    return float(rate) if not isinstance(rate, complex) else None
+    return float(rate) if not isinstance(rate, complex) else 0.0
 
 
 
