@@ -94,11 +94,23 @@ def calculate_xirr(cash_flows, tol=1e-7, max_iter=100):
             total += -(days/365.0) * amt / ((1.0 + rate) ** ((days/365.0) + 1))
         return total
 
-    # Initial guess: CAGR of inflows vs outflows
+    # Initial guess: CAGR of inflows vs outflows with overflow protection
     total_out = sum(-amt for _, amt in flows if amt < 0)
     total_in  = sum(amt for _, amt in flows if amt > 0)
-    years = max((flows[-1][0] - d0).days / 365.0, 1e-6)
-    guess = (total_in / total_out) ** (1.0 / years) - 1.0 if total_out > 0 else 0.1
+    
+    # Use a floor for years to prevent extreme exponentiation
+    years = max((flows[-1][0] - d0).days / 365.0, 0.01)
+    
+    try:
+        if total_out > 1e-6:  # Ensure total_out is significant
+            ratio = total_in / total_out
+            # Cap the ratio to prevent extreme exponential results
+            ratio = min(max(ratio, 0.001), 1000.0) 
+            guess = (ratio ** (1.0 / years)) - 1.0
+        else:
+            guess = 0.1
+    except (OverflowError, ZeroDivisionError):
+        guess = 0.1
 
     # clamp guess into safe domain
     rate = max(min(guess, 5.0), -0.9)

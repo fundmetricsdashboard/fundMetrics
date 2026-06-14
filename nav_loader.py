@@ -30,7 +30,7 @@ def fetch_nav_history(scheme_code: str):
         return []
 
     url = f"https://api.mfapi.in/mf/{scheme_code}"
-    resp = requests.get(url, timeout=10)
+    resp = requests.get(url, timeout=45)
     if resp.status_code != 200:
         print(f"[MFAPI] HTTP {resp.status_code} for scheme {scheme_code}")
         # Raise an exception so the route knows the API failed
