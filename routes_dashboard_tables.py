@@ -50,15 +50,14 @@ def add_transactions(user_id):
         row_count = int(request.form.get("row_count", 0))
 
         for i in range(row_count):
-            fund_id = request.form.get(f"fund_{i}")  # hidden field from autocomplete
-            fund_name = request.form.get(f"fund_name_{i}")  # visible text (not stored)
+            fund_id = request.form.get(f"fund_{i}")  
+            fund_name = request.form.get(f"fund_name_{i}")  
             txn_type = request.form.get(f"txn_type_{i}")
             date_str = request.form.get(f"date_{i}")
             units = request.form.get(f"units_{i}")
             amount = request.form.get(f"amount_{i}")
             nav = request.form.get(f"nav_{i}")
             plan_type = request.form.get(f"plan_type_{i}")
-            registrar = fund.registrar
             folio = request.form.get(f"folio_{i}")
             source_file = request.form.get(f"source_file_{i}")
 
@@ -68,9 +67,10 @@ def add_transactions(user_id):
 
             txn_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-            # Fetch fund to get ISIN
+            # ✅ FIX: Fetch fund FIRST, safely fallback if not found
             fund = Fund.query.get(int(fund_id))
             isin_value = fund.isin if fund else None
+            registrar = fund.registrar if fund else None
 
             inv = Investment(
                 user_id=user.id,
@@ -91,14 +91,14 @@ def add_transactions(user_id):
 
         db.session.commit()
 
-        # --- NEW: Generate snapshots ---
+        # --- Generate snapshots ---
         from snapshot_generator import generate_personal_snapshots, generate_family_snapshots
         generate_personal_snapshots(user.id)
-        generate_family_snapshots(user.id)
+        if user.family_id:
+            generate_family_snapshots(user.family_id)
 
         flash("Transactions added successfully.")
         return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=user.id))
-
 
     # GET request → render form
     return render_template("add_transactions.html", user=user, date=date)

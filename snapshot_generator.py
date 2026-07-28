@@ -35,13 +35,10 @@ def generate_cutoff_dates(years_back=10):
 # NAV lookup for cutoff date
 # ---------------------------------------------------------
 def get_nav_for_cutoff(fund_id, cutoff):
-    """Get NAV on or before cutoff; fallback to next 15 days."""
+    # 1. Try to find the exact NAV or the closest one before
     nav_record = (
         FundNAVHistory.query
-        .filter(
-            FundNAVHistory.fund_id == fund_id,
-            FundNAVHistory.nav_date <= cutoff
-        )
+        .filter(FundNAVHistory.fund_id == fund_id, FundNAVHistory.nav_date <= cutoff)
         .order_by(FundNAVHistory.nav_date.desc())
         .first()
     )
@@ -49,19 +46,16 @@ def get_nav_for_cutoff(fund_id, cutoff):
     if nav_record:
         return float(nav_record.nav_value)
 
-    # Fallback: next 15 days
-    nav_record = (
+    # 2. IF NOT FOUND: Use the absolute earliest NAV available as a proxy 
+    # (prevents data gaps/silent drops)
+    earliest_nav = (
         FundNAVHistory.query
-        .filter(
-            FundNAVHistory.fund_id == fund_id,
-            FundNAVHistory.nav_date > cutoff,
-            FundNAVHistory.nav_date <= cutoff + datetime.timedelta(days=15)
-        )
+        .filter(FundNAVHistory.fund_id == fund_id)
         .order_by(FundNAVHistory.nav_date.asc())
         .first()
     )
 
-    return float(nav_record.nav_value) if nav_record else None
+    return float(earliest_nav.nav_value) if earliest_nav else None
 
 
 # ---------------------------------------------------------
