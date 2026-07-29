@@ -223,64 +223,116 @@ def get_portfolio_holdings(db, user_id):
 # ======== FIFO returns plus XIRR=============
 
 def calculate_fifo_returns(transactions, latest_nav, today=None):
+    """
+    Computes returns for currently-HELD units only (active-lot basis).
+    Realized gains/losses from prior sells are intentionally excluded —
+    xirr reflects only the cash flow of unsold lots vs. current market value.
+    Fully-exited positions return xirr=None (no active lot to measure).
+    """
     import datetime
+    from decimal import Decimal
+    
     if today is None:
         today = datetime.date.today()
 
-    txns = sorted(transactions, key=lambda t: t.date)
+    def to_decimal(x):
+        try:
+            return Decimal(str(x or 0))
+        except Exception:
+            return Decimal('0')
+
+    txns = sorted(
+        transactions, 
+        key=lambda t: normalize_date(t.date) or datetime.datetime.min
+    )
 
     buy_lots = []
-    cash_flows = []
 
     for t in txns:
+        dt_normalized = normalize_date(t.date)
+        
+        # EXPERT FIX: Prevent silent date fallbacks
+        if dt_normalized is None:
+            continue
+            
+        t_date = dt_normalized.date()
+
         if t.transaction_type.lower() == 'buy':
             buy_lots.append({
-                'date': t.date.date() if isinstance(t.date, datetime.datetime) else t.date,
-                'units': float(t.units or 0),
-                'cost': float(t.amount or 0)
+                'date': t_date,
+                'units': to_decimal(t.units),
+                'cost': to_decimal(t.amount)
             })
-            cash_flows.append((t.date, -float(t.amount or 0)))
 
         elif t.transaction_type.lower() == 'sell':
-            units_to_sell = abs(float(t.units or 0))  # normalize units
-            cash_flows.append((t.date, abs(float(t.amount or 0))))  # treat amount as inflow
+            units_to_sell = abs(to_decimal(t.units))
 
-            while units_to_sell > 0 and buy_lots:
+            while units_to_sell > Decimal('0') and buy_lots:
                 lot = buy_lots[0]
-                if lot['units'] <= 0:
+                if lot['units'] <= Decimal('0'):
                     buy_lots.pop(0)
                     continue
 
                 matched_units = min(lot['units'], units_to_sell)
+                
                 proportion = matched_units / lot['units']
                 lot['cost'] -= lot['cost'] * proportion
                 lot['units'] -= matched_units
                 units_to_sell -= matched_units
 
-                if lot['units'] <= 1e-9:
+                if lot['units'] <= Decimal('1e-9'):
                     buy_lots.pop(0)
 
-    remaining_units = sum(lot['units'] for lot in buy_lots)
-    remaining_cost = sum(lot['cost'] for lot in buy_lots)
+    remaining_units_dec = sum((lot['units'] for lot in buy_lots), Decimal('0'))
+    remaining_cost_dec = sum((lot['cost'] for lot in buy_lots), Decimal('0'))
+    
+    remaining_units = float(remaining_units_dec)
+    remaining_cost = float(remaining_cost_dec)
 
-    # ===== Cost‑Weighted Holding Period (years) =====
+    if remaining_units <= 0:
+        return {
+            "remaining_units": 0.0,
+            "cost_value": 0.0,
+            "current_value": 0.0,
+            "absolute_return": 0.0,
+            "xirr": None,
+            "cash_flows": [],     
+            "remaining_lots": [],
+            "holding_period": 0.0    
+        }
+
+    cash_flows = []
+    for lot in buy_lots:
+        if float(lot['cost']) > 0:
+            cash_flows.append((lot['date'], -float(lot['cost'])))
+    
+    nav_dec = to_decimal(latest_nav)
+    current_value_dec = remaining_units_dec * nav_dec
+    current_value = float(current_value_dec)
+    
+    if current_value > 0:
+        cash_flows.append((today, current_value))
+
     weighted_days_sum = 0.0
     total_cost = 0.0
 
     for lot in buy_lots:
-        if lot["cost"] > 0:
+        lot_cost = float(lot["cost"])
+        if lot_cost > 0:
             days_held = (today - lot["date"]).days
-            weighted_days_sum += days_held * float(lot["cost"])
-            total_cost += float(lot["cost"])
+            weighted_days_sum += days_held * lot_cost
+            total_cost += lot_cost
 
     holding_period_years = (weighted_days_sum / total_cost / 365.0) if total_cost > 0 else 0.0
-
-    current_value = float(remaining_units) * float(latest_nav or 0)
-    if current_value > 0:
-        cash_flows.append((today, current_value))
-
     absolute_return = current_value - remaining_cost
-    xirr_val = calculate_xirr(cash_flows) if cash_flows else 0.0
+    
+    has_outflow = any(amt < 0 for _, amt in cash_flows)
+    has_inflow = any(amt > 0 for _, amt in cash_flows)
+    
+    if has_outflow and has_inflow:
+        xirr_val = calculate_xirr(cash_flows)
+    else:
+        xirr_val = None
 
     return {
         "remaining_units": remaining_units,
@@ -292,7 +344,6 @@ def calculate_fifo_returns(transactions, latest_nav, today=None):
         "remaining_lots": buy_lots,
         "holding_period": holding_period_years    
     }
-
 
 # ===========================
 # Process Sell (FIFO Math)

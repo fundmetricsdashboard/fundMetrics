@@ -67,6 +67,17 @@ def add_transactions(user_id):
 
             txn_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
+            # --- NEW MATH LOGIC ---
+            # Convert values to floats first
+            amount = float(amount or 0)
+            nav = float(nav or 0)
+            units = float(units or 0)
+
+            # Calculate units dynamically if they are missing
+            if units == 0 and amount > 0 and nav > 0:
+                units = amount / nav
+            # ----------------------
+
             # ✅ FIX: Fetch fund FIRST, safely fallback if not found
             fund = Fund.query.get(int(fund_id))
             isin_value = fund.isin if fund else None
@@ -78,9 +89,9 @@ def add_transactions(user_id):
                 isin=isin_value,
                 transaction_type=txn_type,
                 date=txn_date,
-                units=float(units or 0),
-                amount=float(amount or 0),
-                nav=float(nav or 0),
+                units=units,     # Now uses the calculated float
+                amount=amount,   # Now uses the float
+                nav=nav,         # Now uses the float
                 plan_type=plan_type,
                 registrar=registrar,
                 folio_number=folio,
@@ -88,6 +99,7 @@ def add_transactions(user_id):
             )
 
             db.session.add(inv)
+            
 
         db.session.commit()
 
