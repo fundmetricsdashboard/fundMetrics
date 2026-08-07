@@ -1,4 +1,5 @@
-from flask import Blueprint, request, redirect, url_for, flash, render_template, jsonify
+import threading
+from flask import Blueprint, request, redirect, url_for, flash, render_template, jsonify, current_app
 from models import User, Investment, InvestmentHistory, Fund, FundNAVHistory, SubCategory, PortfolioSnapshot, DeletionLog
 from datetime import datetime, date
 from utils import calculate_xirr, format_fund_name, calculate_fifo_returns
@@ -7,6 +8,25 @@ from sqlalchemy.orm import joinedload
 from db_config import db
 
 dashboard_tables_bp = Blueprint('dashboard_tables_bp', __name__)
+
+# --- BACKGROUND WORKER HELPER ---
+def trigger_background_snapshots(user_id, family_id):
+    """
+    Runs the heavy snapshot generation in a background thread
+    so Cloudflare doesn't time out while waiting for a response.
+    """
+    app = current_app._get_current_object()
+    
+    def run_snapshots(app_instance, uid, fid):
+        with app_instance.app_context():
+            from snapshot_generator import generate_personal_snapshots, generate_family_snapshots
+            generate_personal_snapshots(uid)
+            if fid:
+                generate_family_snapshots(fid)
+                
+    thread = threading.Thread(target=run_snapshots, args=(app, user_id, family_id))
+    thread.start()
+# ---------------------------------
 
 @dashboard_tables_bp.route("/fund-search")
 def fund_search():
@@ -103,13 +123,10 @@ def add_transactions(user_id):
 
         db.session.commit()
 
-        # --- Generate snapshots ---
-        from snapshot_generator import generate_personal_snapshots, generate_family_snapshots
-        generate_personal_snapshots(user.id)
-        if user.family_id:
-            generate_family_snapshots(user.family_id)
+        # --- Generate snapshots in background ---
+        trigger_background_snapshots(user.id, user.family_id)
 
-        flash("Transactions added successfully.")
+        flash("Transactions added successfully. Snapshots are updating in the background.")
         return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=user.id))
 
     # GET request → render form
@@ -179,6 +196,7 @@ def commit_transactions():
         return redirect(url_for("dashboard_tables_bp.add_transactions", user_id=session.get("user_id")))
 
     inserted = 0
+    user_id = session.get("user_id")
 
     for row in preview_data:
         try:
@@ -188,7 +206,7 @@ def commit_transactions():
             txn_date = datetime.strptime(row["date"], "%Y-%m-%d").date()
 
             inv = Investment(
-                user_id=session.get("user_id"),
+                user_id=user_id,
                 fund_id=row["fund_id"],
                 isin=isin_value,
                 transaction_type=row["txn_type"],
@@ -213,13 +231,13 @@ def commit_transactions():
     db.session.commit()
     session.pop("preview_data", None)
 
-    # Rebuild FIFO + snapshots after manual transaction entry
-    from snapshot_generator import generate_personal_snapshots, generate_family_snapshots
-    generate_personal_snapshots(session.get("user_id"))
-    generate_family_snapshots(session.get("user_id"))
+    # Rebuild snapshots in background
+    user_obj = User.query.get(user_id)
+    fid = user_obj.family_id if user_obj else None
+    trigger_background_snapshots(user_id, fid)
 
-    flash(f"Successfully inserted {inserted} transactions.")
-    return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=session.get("user_id")))
+    flash(f"Successfully inserted {inserted} transactions. Snapshots updating in background.")
+    return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=user_id))
 
 
 
@@ -387,8 +405,6 @@ def dashboard_tables(user_id):
     endpoint="confirm_deletion"
 )
 def confirm_deletion(user_id, registrar):
-    from snapshot_generator import generate_personal_snapshots, generate_family_snapshots
-
     user = User.query.get_or_404(user_id)
 
     if registrar not in {"CAMS", "Karvy", "Commodity", "Manual"}:
@@ -477,11 +493,6 @@ def confirm_deletion(user_id, registrar):
                     # Log the error but don't crash if a sell now lacks sufficient buys
                     print(f"Error rebuilding history after deletion: {e}")
 
-        # 3. Force Snapshot Regeneration
-        generate_personal_snapshots(user.id)
-        if user.family_id:
-            generate_family_snapshots(user.family_id)
-
         # 4. Log deletion
         log = DeletionLog(
             user_id=user.id,
@@ -491,7 +502,10 @@ def confirm_deletion(user_id, registrar):
         db.session.add(log)
         db.session.commit()
 
-        flash(f"✅ Successfully deleted {len(investments_to_delete)} {registrar} records and rebuilt historical ledgers. Reason: {reason}")
+        # 3. Force Snapshot Regeneration in background
+        trigger_background_snapshots(user.id, user.family_id)
+
+        flash(f"✅ Successfully deleted {len(investments_to_delete)} {registrar} records and rebuilt historical ledgers. Reason: {reason}. Snapshots updating in background.")
         return redirect(url_for("upload_center"))
 
     return render_template("confirm_deletion.html", user=user, registrar=registrar)
