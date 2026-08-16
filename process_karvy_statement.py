@@ -125,7 +125,8 @@ def process_karvy_statement(filepath, user_id, batch_id=None, preview=False):
                 nav=nav,
                 transaction_type=txn_type,
                 source_file=source_file,
-                row_hash=row_hash
+                row_hash=row_hash,
+                folio_number=folio
             )
             db.session.add(staging)
             inserted += 1

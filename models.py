@@ -124,8 +124,7 @@ class StagingInvestment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     # Give every upload a unique ticket so they don't overwrite each other
-    batch_id = db.Column(db.String(64), nullable=True) 
-    
+    batch_id = db.Column(db.String(64), nullable=True)  
     isin = db.Column(db.String(20), nullable=False)
     date = db.Column(db.Date, nullable=False)
     amount = db.Column(Numeric(18,2), nullable=False)
@@ -134,6 +133,7 @@ class StagingInvestment(db.Model):
     transaction_type = db.Column(db.String(20), nullable=False)
     source_file = db.Column(db.String(255))
     row_hash = db.Column(db.String(64), nullable=False)
+    folio_number = db.Column(db.String(100), nullable=True)
     imported_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class InvestmentHistory(db.Model):

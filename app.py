@@ -521,7 +521,8 @@ def confirm_upload():
             units=raw.units,
             date=raw.date, 
             source_file=raw.source_file,
-            registrar=fund.registrar
+            registrar=fund.registrar,
+            folio_number=raw.folio_number
         )
         db.session.add(inv)
         inserted += 1
