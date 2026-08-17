@@ -1,6 +1,7 @@
 import threading
-from flask import Blueprint, request, redirect, url_for, flash, render_template, jsonify, current_app
-from models import User, Investment, InvestmentHistory, Fund, FundNAVHistory, SubCategory, PortfolioSnapshot, DeletionLog
+import hashlib
+from flask import Blueprint, request, redirect, url_for, flash, render_template, jsonify, current_app, session
+from models import User, Investment, InvestmentHistory, Fund, FundNAVHistory, SubCategory, PortfolioSnapshot, DeletionLog, StagingInvestment
 from datetime import datetime, date
 from utils import calculate_xirr, format_fund_name, calculate_fifo_returns
 from sqlalchemy import func
@@ -61,13 +62,16 @@ def fund_search():
     return jsonify({"results": payload})
 
 
-# Add Transactions Route #
+# Add Transactions Route (Staging Pipeline) #
 @dashboard_tables_bp.route("/add-transactions/<int:user_id>", methods=["GET", "POST"])
 def add_transactions(user_id):
     user = User.query.get_or_404(user_id)
 
     if request.method == "POST":
         row_count = int(request.form.get("row_count", 0))
+        
+        # Clear any stale staging data for this user before starting
+        StagingInvestment.query.filter_by(user_id=user.id).delete()
 
         for i in range(row_count):
             fund_id = request.form.get(f"fund_{i}")  
@@ -77,9 +81,7 @@ def add_transactions(user_id):
             units = request.form.get(f"units_{i}")
             amount = request.form.get(f"amount_{i}")
             nav = request.form.get(f"nav_{i}")
-            plan_type = request.form.get(f"plan_type_{i}")
             folio = request.form.get(f"folio_{i}")
-            source_file = request.form.get(f"source_file_{i}")
 
             # Skip incomplete rows
             if not fund_id or not txn_type or not date_str:
@@ -87,7 +89,6 @@ def add_transactions(user_id):
 
             txn_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-            # --- NEW MATH LOGIC ---
             # Convert values to floats first
             amount = float(amount or 0)
             nav = float(nav or 0)
@@ -96,149 +97,41 @@ def add_transactions(user_id):
             # Calculate units dynamically if they are missing
             if units == 0 and amount > 0 and nav > 0:
                 units = amount / nav
-            # ----------------------
 
-            # ✅ FIX: Fetch fund FIRST, safely fallback if not found
+            # Fetch fund FIRST, safely fallback if not found
             fund = Fund.query.get(int(fund_id))
             isin_value = fund.isin if fund else None
-            registrar = fund.registrar if fund else None
+            
+            # Generate a unique hash for deduplication logic on the preview screen
+            raw_str = f"{fund_id}{txn_type}{date_str}{amount}{units}{nav}{folio}manual_entry"
+            row_hash = hashlib.md5(raw_str.encode()).hexdigest()
 
-            inv = Investment(
+            # ✅ Write to STAGING table, not the live Investment table
+            stg = StagingInvestment(
                 user_id=user.id,
-                fund_id=int(fund_id),
                 isin=isin_value,
                 transaction_type=txn_type,
                 date=txn_date,
-                units=units,     # Now uses the calculated float
-                amount=amount,   # Now uses the float
-                nav=nav,         # Now uses the float
-                plan_type=plan_type,
-                registrar=registrar,
+                amount=amount,
+                units=units,
+                nav=nav,
                 folio_number=folio,
-                source_file=source_file,
+                source_file="manual_entry",  # Matches confirm_deletion requirement
+                row_hash=row_hash
             )
-
-            db.session.add(inv)
+            db.session.add(stg)
             
-
         db.session.commit()
 
-        # --- Generate snapshots in background ---
-        trigger_background_snapshots(user.id, user.family_id)
+        # Clear old session flags, set registrar to Manual, and route to the universal preview
+        session.pop("clarification_done", None)
+        session.pop("duplicate_groups", None)
+        session['registrar'] = "Manual"
 
-        flash("Transactions added successfully. Snapshots are updating in the background.")
-        return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=user.id))
+        return redirect(url_for("preview_upload"))
 
     # GET request → render form
     return render_template("add_transactions.html", user=user, date=date)
-
-@dashboard_tables_bp.route("/preview-transactions", methods=["POST"])
-def preview_transactions():
-    """
-    Build a preview list from the posted add-transactions form.
-    Nothing is saved to DB here.
-    """
-    row_count = int(request.form.get("row_count", 0))
-    preview_data = []
-
-    for i in range(row_count):
-        fund_id = request.form.get(f"fund_{i}")
-        fund_name = request.form.get(f"fund_name_{i}")
-        txn_type = request.form.get(f"txn_type_{i}")
-        date_str = request.form.get(f"date_{i}")
-        amount = request.form.get(f"amount_{i}")
-        nav = request.form.get(f"nav_{i}")
-        folio = request.form.get(f"folio_{i}")
-
-        # Skip empty rows
-        if not fund_id or not txn_type or not date_str:
-            continue
-
-        # Compute units
-        units = None
-        try:
-            if amount and nav:
-                units = float(amount) / float(nav)
-        except:
-            units = None
-
-        preview_data.append({
-            "fund_id": int(fund_id),
-            "fund_name": fund_name,
-            "txn_type": txn_type,
-            "date": date_str,
-            "amount": float(amount or 0),
-            "nav": float(nav or 0),
-            "units": units,
-            "folio": folio
-        })
-
-    # Store in session for commit step
-    from flask import session
-    session["preview_data"] = preview_data
-
-    return render_template(
-        "preview_transactions.html",
-        preview_data=preview_data
-    )
-
-
-@dashboard_tables_bp.route("/commit-transactions", methods=["POST"])
-def commit_transactions():
-    """
-    Commit the previewed transactions into the Investment table.
-    """
-    from flask import session
-    preview_data = session.get("preview_data", [])
-
-    if not preview_data:
-        flash("No preview data found.")
-        return redirect(url_for("dashboard_tables_bp.add_transactions", user_id=session.get("user_id")))
-
-    inserted = 0
-    user_id = session.get("user_id")
-
-    for row in preview_data:
-        try:
-            fund = Fund.query.get(row["fund_id"])
-            isin_value = fund.isin if fund else None
-
-            txn_date = datetime.strptime(row["date"], "%Y-%m-%d").date()
-
-            inv = Investment(
-                user_id=user_id,
-                fund_id=row["fund_id"],
-                isin=isin_value,
-                transaction_type=row["txn_type"],
-                date=txn_date,
-                amount=row["amount"],
-                nav=row["nav"],
-                units=row["units"],
-                folio_number=row["folio"],
-                plan_type="Direct" if "direct" in (fund.name or "").lower() else "Regular",
-                registrar=fund.registrar,
-                source_file="manual_entry"
-            )
-
-            db.session.add(inv)
-            inserted += 1
-
-        except Exception as e:
-            print("Commit error:", e)
-            db.session.rollback()
-            db.session.begin_nested()
-
-    db.session.commit()
-    session.pop("preview_data", None)
-
-    # Rebuild snapshots in background
-    user_obj = User.query.get(user_id)
-    fid = user_obj.family_id if user_obj else None
-    trigger_background_snapshots(user_id, fid)
-
-    flash(f"Successfully inserted {inserted} transactions. Snapshots updating in background.")
-    return redirect(url_for("dashboard_tables_bp.dashboard_tables", user_id=user_id))
-
 
 
 @dashboard_tables_bp.route('/dashboard-tables/<int:user_id>', endpoint='dashboard_tables')

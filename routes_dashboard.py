@@ -437,7 +437,7 @@ def preview_sync_nav():
         registrar = session.get("registrar")
 
         # For CAMS/Karvy: get ISINs from staging table
-        if registrar in ("Karvy", "CAMS"):
+        if registrar in ("Karvy", "CAMS", "Manual"):
             # Fetch all rows, then use Python set comprehension to get unique ISINs
             # This avoids the SQLite distinct() error
             rows = StagingInvestment.query.filter_by(user_id=current_user.id).all()

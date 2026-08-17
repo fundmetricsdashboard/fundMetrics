@@ -210,7 +210,7 @@ def preview_upload():
         return redirect(url_for('upload'))
 
     # If this is Karvy or CAMS, preview should come from STAGING
-    if registrar in ("Karvy", "CAMS"):
+    if registrar in ("Karvy", "CAMS", "Manual"):
         # ONLY check duplicates if clarification hasn't been done yet
         if not session.get("clarification_done"):
             # Check duplicates in staging
